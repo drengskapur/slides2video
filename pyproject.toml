@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pptx2video"
+dynamic = ["version"]
+description = 'Transform PowerPoint presentations to videos with voiceovers.'
+readme = "README.md"
+requires-python = ">=3.7"
+license = ""
+keywords = []
+authors = [
+  { name = "Drengskapur", email = "service@drengskapur.com" },
+]
+dependencies = [
+    "dvc",
+    "ffmpeg-python",
+    "natsort",
+    "openai",
+    "pdf2image",
+    "python-dotenv",
+    "python-pptx",
+    "tenacity"
+]
+
+[project.urls]
+Documentation = "https://github.com/drengskapur/pptx2video#readme"
+Issues = "https://github.com/drengskapur/pptx2video/issues"
+Source = "https://github.com/drengskapur/pptx2video"
+
+[tool.hatch.version]
+path = "src/__about__.py"
+
+[[tool.hatch.envs.all.matrix]]
+python = ["3.7", "3.8", "3.9", "3.10", "3.11"]

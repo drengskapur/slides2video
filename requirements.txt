@@ -1,0 +1,8 @@
+dvc
+ffmpeg-python
+natsort
+openai
+pdf2image
+python-dotenv
+python-pptx
+tenacity

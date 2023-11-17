@@ -1,0 +1,49 @@
+stages:
+  convert_pptx_to_pdf:
+    cmd: python3 src/pptx2pdf.py "${POWERPOINT}"
+    deps:
+      - src/pptx2pdf.py
+      - "${POWERPOINT}"
+    outs:
+      - assets/powerpoint.pdf
+
+  convert_pdf_to_images:
+    cmd: python3 src/pdf2png.py assets/powerpoint.pdf
+    deps:
+      - src/pdf2png.py
+      - assets/powerpoint.pdf
+    outs:
+      - assets/images/
+
+  extract_notes_from_powerpoint:
+    cmd: python3 src/extract_notes.py "${POWERPOINT}"
+    deps:
+      - src/extract_notes.py
+      - "${POWERPOINT}"
+    outs:
+      - assets/notes/
+
+  text_to_speech:
+    cmd: python3 src/text2speech.py
+    deps:
+      - src/text2speech.py
+      - assets/notes/
+    outs:
+      - assets/voiceovers/
+
+  generate_videoclips:
+    cmd: python3 src/generate_videoclips.py assets
+    deps:
+      - src/generate_videoclips.py
+      - assets/images/
+      - assets/voiceovers/
+    outs:
+      - assets/videoclips/
+
+  assemble_video:
+    cmd: python3 src/assemble_video.py assets "${VIDEO_NAME}"
+    deps:
+      - src/assemble_video.py
+      - assets/videoclips/
+    outs:
+      - "${VIDEO_NAME}"
