@@ -3,7 +3,7 @@ import argparse
 import logging
 import os
 import pathlib
-import subprocess
+import shutil
 import textwrap
 import time
 
@@ -16,16 +16,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
-
-
-def create_silent_audio(silent_audio_path: pathlib.Path, duration: float = 0.5):
-    if not silent_audio_path.exists():
-        logging.info(f"Creating a silent audio file at {silent_audio_path}")
-        (
-            ffmpeg.input("anullsrc", format="lavfi", r=44100)
-            .output(str(silent_audio_path), audio_bitrate="192k", t=duration)
-            .run()
-        )
 
 
 def format_preview_text(text: str, width: int = 80) -> str:
@@ -55,7 +45,6 @@ def text_to_speech(
     silent_audio_path: pathlib.Path,
 ):
     try:
-        # Check if the file exists and read the text
         if text_file_path.exists():
             with open(text_file_path, "r", encoding="utf-8") as text_file:
                 text = text_file.read()
@@ -63,13 +52,11 @@ def text_to_speech(
             logging.warning(f"Note file {text_file_path} does not exist.")
             return
 
-        # Check if the text is empty or just whitespace
         if not text.strip():
             logging.info(f"Text file {text_file_path} is empty. Using silent audio.")
             shutil.copy(silent_audio_path, path_to_save)
             return
 
-        # Process the text and generate TTS
         preview_text = format_preview_text(text)
         logging.info(f"\n\n{preview_text}\n\n")
         client = openai.OpenAI(api_key=api_key)
@@ -79,7 +66,6 @@ def text_to_speech(
             audio_file.write(response.content)
             logging.info(f"Original voiceover saved to {temp_path}")
 
-        # Concatenate silent audio with generated voiceover
         silent_audio = ffmpeg.input(silent_audio_path)
         voiceover_audio = ffmpeg.input(temp_path)
         output_path = str(path_to_save)
@@ -114,8 +100,7 @@ if __name__ == "__main__":
     notes_dir = pathlib.Path("assets/notes")
     voiceover_dir = pathlib.Path("assets/voiceovers")
     voiceover_dir.mkdir(parents=True, exist_ok=True)
-    silent_audio_path = pathlib.Path("assets/silent.mp3")
-    create_silent_audio(silent_audio_path)
+    silent_audio_path = pathlib.Path("assets/silence.mp3")
     num_notes = len(list(notes_dir.glob("note_*.txt")))
     for i in range(1, num_notes + 1):
         note_file = notes_dir / f"note_{i}.txt"

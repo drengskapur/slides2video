@@ -1,9 +1,16 @@
 stages:
+  check:
+    cmd: python3 src/check.py
+    deps:
+      - src/check.py
+    outs:
+      - workingdir/powerpoint.pptx
+
   convert_pptx_to_pdf:
-    cmd: python3 src/pptx2pdf.py "${POWERPOINT}"
+    cmd: python3 src/pptx2pdf.py
     deps:
       - src/pptx2pdf.py
-      - "${POWERPOINT}"
+      - workingdir/powerpoint.pptx
     outs:
       - assets/powerpoint.pdf
 
@@ -16,17 +23,25 @@ stages:
       - assets/images/
 
   extract_notes_from_powerpoint:
-    cmd: python3 src/extract_notes.py "${POWERPOINT}"
+    cmd: python3 src/extract_notes.py
     deps:
+      - workingdir/powerpoint.pptx
       - src/extract_notes.py
-      - "${POWERPOINT}"
     outs:
       - assets/notes/
+
+  create_silent_video:
+    cmd: ./src/create_silent_audio.sh 0.5 assets silence.mp3
+    deps:
+      - src/create_silent_audio.sh
+    outs:
+      - assets/silence.mp3
 
   text_to_speech:
     cmd: python3 src/text2speech.py
     deps:
       - src/text2speech.py
+      - assets/silence.mp3
       - assets/notes/
     outs:
       - assets/voiceovers/
@@ -41,9 +56,9 @@ stages:
       - assets/videoclips/
 
   assemble_video:
-    cmd: python3 src/assemble_video.py assets "${VIDEO_NAME}"
+    cmd: python3 src/assemble_video.py assets
     deps:
       - src/assemble_video.py
       - assets/videoclips/
     outs:
-      - "${VIDEO_NAME}"
+      - output/

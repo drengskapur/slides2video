@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "pptx2video"
+name = "slides2video"
 dynamic = ["version"]
 description = 'Transform PowerPoint presentations to videos with voiceovers.'
 readme = "README.md"
@@ -25,9 +25,9 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/drengskapur/pptx2video#readme"
-Issues = "https://github.com/drengskapur/pptx2video/issues"
-Source = "https://github.com/drengskapur/pptx2video"
+Documentation = "https://github.com/drengskapur/slides2video#readme"
+Issues = "https://github.com/drengskapur/slides2video/issues"
+Source = "https://github.com/drengskapur/slides2video"
 
 [tool.hatch.version]
 path = "src/__about__.py"

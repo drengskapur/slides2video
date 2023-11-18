@@ -1,4 +1,4 @@
-# pptx2video
+# slides2video
 Transform PowerPoint presentations to videos with voiceovers.
 
 The voiceover text is generated from the "Notes" section of each PowerPoint slide.
@@ -14,7 +14,7 @@ The voiceover text is generated from the "Notes" section of each PowerPoint slid
 Clone the repository:
 
 ```console
-git clone https://github.com/drengskapur/pptx2video
+git clone https://github.com/drengskapur/slides2video
 ```
 
 Install requirements with pip:

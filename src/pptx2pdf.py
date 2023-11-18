@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import argparse
 import logging
 import shutil
 import subprocess
@@ -45,9 +44,10 @@ def convert_pptx_to_pdf(input_pptx: Path):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Convert a PowerPoint (.pptx) file to a PDF file."
-    )
-    parser.add_argument("pptx", type=Path, help="Input PowerPoint (.pptx) file")
-    args = parser.parse_args()
-    convert_pptx_to_pdf(args.pptx)
+    input_folder = Path("input")
+    pptx_files = list(input_folder.glob("*.pptx"))
+
+    if not pptx_files:
+        logging.error("No PowerPoint files found in the 'input' folder.")
+    else:
+        convert_pptx_to_pdf(pptx_files[0])

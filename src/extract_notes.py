@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import argparse
 import logging
 from pathlib import Path
 
@@ -29,9 +28,10 @@ def extract_notes(input_pptx):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Extract notes from a PowerPoint (.pptx) file."
-    )
-    parser.add_argument("pptx", type=Path, help="Input PowerPoint (.pptx) file")
-    args = parser.parse_args()
-    extract_notes(args.pptx)
+    input_folder = Path("input")
+    pptx_files = list(input_folder.glob("*.pptx"))
+
+    if not pptx_files:
+        logging.error("No PowerPoint files found in the 'input' folder.")
+    else:
+        extract_notes(pptx_files[0])

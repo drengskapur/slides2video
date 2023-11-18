@@ -1,0 +1,12 @@
+!input/.gitkeep
+!output/.gitkeep
+.dvc/
+.git/
+.venv/
+assets/
+build.sh
+dist/
+Dockerfile
+dvc.lock
+pyproject.toml
+src/__about__.py

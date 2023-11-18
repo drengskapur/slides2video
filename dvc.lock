@@ -1,0 +1,139 @@
+schema: '2.0'
+stages:
+  check:
+    cmd: python3 src/check.py
+    deps:
+    - path: src/check.py
+      hash: md5
+      md5: d80b9fa2fbc42ee860ea0b1474362e00
+      size: 807
+    outs:
+    - path: workingdir/powerpoint.pptx
+      hash: md5
+      md5: ca7113f37bd973a239395a40b88f63d7
+      size: 13789930
+  convert_pptx_to_pdf:
+    cmd: python3 src/pptx2pdf.py
+    deps:
+    - path: src/pptx2pdf.py
+      hash: md5
+      md5: cfca435f9fed45b42ffc5174e1299296
+      size: 1630
+    - path: workingdir/powerpoint.pptx
+      hash: md5
+      md5: ca7113f37bd973a239395a40b88f63d7
+      size: 13789930
+    outs:
+    - path: assets/powerpoint.pdf
+      hash: md5
+      md5: 8db35f64053bc96c9b77b892f5cd6498
+      size: 1618687
+  convert_pdf_to_images:
+    cmd: python3 src/pdf2png.py assets/powerpoint.pdf
+    deps:
+    - path: assets/powerpoint.pdf
+      hash: md5
+      md5: 8db35f64053bc96c9b77b892f5cd6498
+      size: 1618687
+    - path: src/pdf2png.py
+      hash: md5
+      md5: 56100bd6c9a0797dae11b742e632a9f8
+      size: 1168
+    outs:
+    - path: assets/images/
+      hash: md5
+      md5: 7ea8902da84d812ff1883c8e11fd0ead.dir
+      size: 15894594
+      nfiles: 4
+  extract_notes_from_powerpoint:
+    cmd: python3 src/extract_notes.py
+    deps:
+    - path: src/extract_notes.py
+      hash: md5
+      md5: 6af6d829ff5bf650994da097d69480c3
+      size: 1347
+    - path: workingdir/powerpoint.pptx
+      hash: md5
+      md5: ca7113f37bd973a239395a40b88f63d7
+      size: 13789930
+    outs:
+    - path: assets/notes/
+      hash: md5
+      md5: 2130cadb120b19ec8b3dd92f9ff95991.dir
+      size: 992
+      nfiles: 4
+  create_silent_video:
+    cmd: ./src/create_silent_audio.sh 0.5 assets silence.mp3
+    deps:
+    - path: src/create_silent_audio.sh
+      hash: md5
+      md5: 2799d72e0e123e5a31b83de4b2012ab6
+      size: 421
+    outs:
+    - path: assets/silence.mp3
+      hash: md5
+      md5: 94cfda8a2f1a82e97e7869ae66e0cff4
+      size: 4615
+  text_to_speech:
+    cmd: python3 src/text2speech.py
+    deps:
+    - path: assets/notes/
+      hash: md5
+      md5: 2130cadb120b19ec8b3dd92f9ff95991.dir
+      size: 992
+      nfiles: 4
+    - path: assets/silence.mp3
+      hash: md5
+      md5: 94cfda8a2f1a82e97e7869ae66e0cff4
+      size: 4615
+    - path: src/text2speech.py
+      hash: md5
+      md5: 819bbb675a8e24a0a2141cf1058014a2
+      size: 3850
+    outs:
+    - path: assets/voiceovers/
+      hash: md5
+      md5: c5e7508b77b24ae7c37cba88c631e702.dir
+      size: 525445
+      nfiles: 4
+  generate_videoclips:
+    cmd: python3 src/generate_videoclips.py assets
+    deps:
+    - path: assets/images/
+      hash: md5
+      md5: 7ea8902da84d812ff1883c8e11fd0ead.dir
+      size: 15894594
+      nfiles: 4
+    - path: assets/voiceovers/
+      hash: md5
+      md5: c5e7508b77b24ae7c37cba88c631e702.dir
+      size: 525445
+      nfiles: 4
+    - path: src/generate_videoclips.py
+      hash: md5
+      md5: 0d3a84f19880b00ebd02cf76e2dd6887
+      size: 5420
+    outs:
+    - path: assets/videoclips/
+      hash: md5
+      md5: 0ec9884fcb1b9201b9841c757bd7e3c3.dir
+      size: 11059825
+      nfiles: 4
+  assemble_video:
+    cmd: python3 src/assemble_video.py assets
+    deps:
+    - path: assets/videoclips/
+      hash: md5
+      md5: f865ca2a9e7cd53d6ba6fad47ba48971.dir
+      size: 11059917
+      nfiles: 5
+    - path: src/assemble_video.py
+      hash: md5
+      md5: 59018f7d1e788375fb655341447756c1
+      size: 2058
+    outs:
+    - path: output/
+      hash: md5
+      md5: 05d5a17a37f243108602b28a5344e0b5.dir
+      size: 8164750
+      nfiles: 1

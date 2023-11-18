@@ -2,7 +2,6 @@
 import argparse
 import logging
 import pathlib
-import shlex
 import subprocess
 from typing import Union
 

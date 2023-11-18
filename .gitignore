@@ -162,3 +162,5 @@ cython_debug/
 # project-based ignores
 assets/
 .dvcignore
+/example.mp4
+/output
