@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+docker build -t slides2video .
+
 OUTPUT_DIR="${HOME}/slides2video/output"
 CONTAINER_NAME="slides2video"
 
@@ -12,7 +14,7 @@ fi
 echo "Creating output directory..."
 mkdir -p "${OUTPUT_DIR}"
 
-sudo chmod -R a+rwX "${OUTPUT_DIR}"
+chmod -R a+rwX "${OUTPUT_DIR}"
 
 if [ "$(docker ps -aq -f name=^/${CONTAINER_NAME}$)" ]; then
     echo "Removing existing container with the same name..."

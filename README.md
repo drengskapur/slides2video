@@ -3,10 +3,27 @@ Transform PowerPoint presentations to videos with voiceovers.
 
 The voiceover text is generated from the "Notes" section of each PowerPoint slide.
 
-## Requirements
+## Docker
+
+To use the Docker image, put the PowerPoint (`.pptx`) inside the `input` folder, and run:
+
+```bash
+./run.sh
+```
+
+## Manual Execution
 
 > [!IMPORTANT]
-> You must install LibreOffice and FFmpeg.
+> You must have an [OpenAI API key](https://platform.openai.com/api-keys).
+
+Put your OpenAI API key in the `.env` file:
+
+`.env`
+```
+OPENAI_API_KEY='sk-<YOUR_OPENAI_API_KEY>'
+```
+
+Install LibreOffice and FFmpeg:
 
 1. **LibreOffice**: Download and install from [LibreOffice Download](https://www.libreoffice.org/download/download-libreoffice/).
 2. **FFmpeg**: Download and install from [FFmpeg Download](https://ffmpeg.org/download.html).
@@ -17,25 +34,10 @@ Clone the repository:
 git clone https://github.com/drengskapur/slides2video
 ```
 
-Install requirements with pip:
+Install pip requirements:
 
 ```console
 pip install -r requirements.txt
-```
-
-## Configuration
-
-> [!IMPORTANT]
-> You must have an [OpenAI API key](https://platform.openai.com/api-keys).
-
-Put the PowerPoint in the repository folder and set the `params.yml`.
-
-`params.yml`
-```yml
-# INPUT POWERPOINT
-POWERPOINT: "your_presentation.pptx"
-# OUTPUT VIDEO
-VIDEO_NAME: "your_video_output.mp4"
 ```
 
 ## Usage
