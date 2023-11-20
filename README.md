@@ -1,10 +1,14 @@
 # slides2video
 Transform PowerPoint presentations to videos with voiceovers.
 
-The voiceover text is generated from the "Notes" section of each PowerPoint slide.
-
 > [!IMPORTANT]
 > You must have an [OpenAI API key](https://platform.openai.com/api-keys).
+
+Preview example output [here](example.mp4).
+
+The voiceover text is generated from the "Notes" section of each PowerPoint slide.
+
+![notes.png](notes.png)
 
 ## Run in Google Colab [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1KRWFApDh82o2mE_b6x9tnf9Ofipts6QO?usp=sharing)
 
