@@ -14,22 +14,17 @@ The voiceover text is generated from the "Notes" section of each PowerPoint slid
 
 This is the easiest method because all the infrastructure is set up.
 
-## Docker
-
-To use the Docker image, put the PowerPoint (`.pptx`) inside the `input` folder, and run:
-
-```bash
-./run.sh
-```
-
-## Manual Execution
+## OpenAI API Key
 
 Put your OpenAI API key in the `.env` file:
 
 `.env`
+
 ```
 OPENAI_API_KEY='<YOUR_OPENAI_API_KEY>'
 ```
+
+## Manual Execution
 
 Install LibreOffice and FFmpeg:
 
@@ -52,4 +47,12 @@ To run the pipeline, enter the command:
 
 ```console
 dvc repro
+```
+
+## Docker
+
+To use the Docker image, put the PowerPoint (`.pptx`) inside the `input` folder, and run:
+
+```bash
+./run.sh
 ```
