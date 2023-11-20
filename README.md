@@ -3,6 +3,13 @@ Transform PowerPoint presentations to videos with voiceovers.
 
 The voiceover text is generated from the "Notes" section of each PowerPoint slide.
 
+> [!IMPORTANT]
+> You must have an [OpenAI API key](https://platform.openai.com/api-keys).
+
+## Run in Google Colab [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1KRWFApDh82o2mE_b6x9tnf9Ofipts6QO?usp=sharing)
+
+This is the easiest method because all the infrastructure is set up.
+
 ## Docker
 
 To use the Docker image, put the PowerPoint (`.pptx`) inside the `input` folder, and run:
@@ -12,9 +19,6 @@ To use the Docker image, put the PowerPoint (`.pptx`) inside the `input` folder,
 ```
 
 ## Manual Execution
-
-> [!IMPORTANT]
-> You must have an [OpenAI API key](https://platform.openai.com/api-keys).
 
 Put your OpenAI API key in the `.env` file:
 
@@ -40,9 +44,7 @@ Install pip requirements:
 pip install -r requirements.txt
 ```
 
-## Usage
-
-To start the pipeline, enter the command:
+To run the pipeline, enter the command:
 
 ```console
 dvc repro
