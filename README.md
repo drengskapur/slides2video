@@ -20,7 +20,7 @@ Put your OpenAI API key in the `.env` file:
 
 `.env`
 ```
-OPENAI_API_KEY='sk-<YOUR_OPENAI_API_KEY>'
+OPENAI_API_KEY='<YOUR_OPENAI_API_KEY>'
 ```
 
 Install LibreOffice and FFmpeg:
