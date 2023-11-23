@@ -58,31 +58,35 @@ function* uploadFilesStep(inputId, outputId) {
   const outputElement = document.getElementById(outputId);
   outputElement.innerHTML = '';
 
+  let uploadCanceled = false; // Flag to indicate if upload is canceled
+
   const pickedPromise = new Promise((resolve) => {
     inputElement.addEventListener('change', (e) => {
+      outputElement.innerHTML = ''; // Clear previous output on new file selection
+      uploadCanceled = false; // Reset the cancel flag
       resolve(e.target.files);
     });
   });
 
+  // Cancel button to stop the current upload
   const cancel = document.createElement('button');
+  cancel.textContent = 'Cancel Current Upload';
+  cancel.onclick = () => {
+    uploadCanceled = true; // Set the cancel flag
+    outputElement.innerHTML = ''; // Clear the output display
+  };
   inputElement.parentElement.appendChild(cancel);
-  cancel.textContent = 'Cancel upload';
-  const cancelPromise = new Promise((resolve) => {
-    cancel.onclick = () => {
-      resolve(null);
-    };
-  });
 
   // Wait for the user to pick the files.
   const files = yield {
-    promise: Promise.race([pickedPromise, cancelPromise]),
+    promise: Promise.race([pickedPromise]),
     response: {
       action: 'starting',
     }
   };
 
   cancel.remove();
-  inputElement.disabled = true;
+  inputElement.disabled = false;
 
   if (!files) {
     return {
@@ -93,6 +97,10 @@ function* uploadFilesStep(inputId, outputId) {
   }
 
   for (const file of files) {
+    if (uploadCanceled) {
+      break; // Exit the loop if upload is canceled
+    }
+
     const li = document.createElement('li');
 
     // Create and append the progress bar
@@ -104,11 +112,6 @@ function* uploadFilesStep(inputId, outputId) {
     // Create and append the percentage span
     const percent = span(' 0% ');
     li.appendChild(percent);
-
-    // Append the file name
-    li.append(span(file.name, {fontWeight: 'bold'}));
-    li.append(span(` (${file.size} bytes) `));
-
     outputElement.appendChild(li);
 
     const fileDataPromise = new Promise((resolve) => {
