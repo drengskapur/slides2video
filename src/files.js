@@ -1,6 +1,6 @@
 // ADAPTED FROM: https://github.com/googlecolab/colabtools/blob/main/google/colab/resources/files.js
 (function(scope) {
-  
+
   const MAX_PAYLOAD_SIZE = 100 * 1024;
 
   function _uploadFiles(inputId, outputId) {
