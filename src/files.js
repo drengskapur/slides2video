@@ -53,38 +53,29 @@ function _uploadFilesContinue(outputId) {
  */
 function* uploadFilesStep(inputId, outputId) {
   const inputElement = document.getElementById(inputId);
+  inputElement.disabled = false;
+
   const outputElement = document.getElementById(outputId);
-  let cancel; // Declare the cancel button variable
+  outputElement.innerHTML = '';
 
-  // Function to show and handle the cancel button
-  const handleCancelButton = () => {
-    cancel = document.createElement('button');
-    cancel.textContent = 'Cancel';
-    cancel.onclick = () => {
-      uploadCanceled = true; // Set the cancel flag
-      outputElement.innerHTML = ''; // Clear the output display
-      cancel.remove(); // Remove the cancel button
-      inputElement.disabled = false; // Re-enable the input element
-    };
-    inputElement.parentElement.appendChild(cancel);
-  };
+  let uploadCanceled = false; // Flag to indicate if upload is canceled
 
-  const clearCancelButton = () => {
-    if (cancel && cancel.parentNode) {
-      cancel.remove();
-    }
-  };
-  
   const pickedPromise = new Promise((resolve) => {
     inputElement.addEventListener('change', (e) => {
-      // Clear previous output on new file selection
+      outputElement.innerHTML = ''; // Clear previous output on new file selection
       uploadCanceled = false; // Reset the cancel flag
-      outputElement.innerHTML = ''; 
       resolve(e.target.files);
-      // Show the cancel button when files are picked
-      showCancelButton(); 
     });
   });
+
+  // Cancel button to stop the current upload
+  const cancel = document.createElement('button');
+  cancel.textContent = 'Cancel Current Upload';
+  cancel.onclick = () => {
+    uploadCanceled = true; // Set the cancel flag
+    outputElement.innerHTML = ''; // Clear the output display
+  };
+  inputElement.parentElement.appendChild(cancel);
 
   // Wait for the user to pick the files.
   const files = yield {
@@ -94,12 +85,10 @@ function* uploadFilesStep(inputId, outputId) {
     }
   };
 
-  inputElement.disabled = true; // Disable input during upload
-  handleCancelButton(); // Show the cancel button
+  cancel.remove();
+  inputElement.disabled = false;
 
   if (!files) {
-    // Remove the cancel button if no files were picked
-    cancel && cancel.remove(); 
     return {
       response: {
         action: 'complete',
@@ -109,7 +98,6 @@ function* uploadFilesStep(inputId, outputId) {
 
   for (const file of files) {
     if (uploadCanceled) {
-      clearCancelButton();
       break; // Exit the loop if upload is canceled
     }
 
@@ -171,8 +159,6 @@ function* uploadFilesStep(inputId, outputId) {
       action: 'complete',
     }
   };
-  // Remove the cancel button after completion
-  cancel && cancel.remove();
 }
 
 
