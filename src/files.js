@@ -102,7 +102,7 @@ function* uploadFilesStep(inputId, outputId) {
     li.appendChild(progressBar);
 
     // Create and append the percentage span
-    const percent = span('0%');
+    const percent = span(' 0% ');
     li.appendChild(percent);
 
     // Append the file name
@@ -144,7 +144,7 @@ function* uploadFilesStep(inputId, outputId) {
       let percentDone = fileData.byteLength === 0 ?
           100 :
           Math.round((position / fileData.byteLength) * 100);
-      percent.textContent = `${percentDone}%`;
+      percent.textContent = ` ${percentDone}% `;
       progressBar.value = position;
 
     } while (position < fileData.byteLength);
