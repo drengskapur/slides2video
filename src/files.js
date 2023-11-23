@@ -1,3 +1,5 @@
+// ADAPTED FROM: https://github.com/googlecolab/colabtools/blob/main/google/colab/resources/files.js
+
 /**
  * @fileoverview Helpers for google.colab Python module.
  */
@@ -95,11 +97,7 @@ function* uploadFilesStep(inputId, outputId) {
   for (const file of files) {
     const li = document.createElement('li');
     li.append(span(file.name, {fontWeight: 'bold'}));
-    li.append(span(
-        `(${file.type || 'n/a'}) - ${file.size} bytes, ` +
-        `last modified: ${
-            file.lastModifiedDate ? file.lastModifiedDate.toLocaleDateString() :
-                                    'n/a'} - `));
+    li.append(span(` (${file.size} bytes)`));
     const percent = span('0% done');
     li.appendChild(percent);
 
