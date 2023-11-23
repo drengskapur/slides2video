@@ -59,23 +59,27 @@ function* uploadFilesStep(inputId, outputId) {
   outputElement.innerHTML = '';
 
   let uploadCanceled = false; // Flag to indicate if upload is canceled
+  let cancel; // Declare the cancel button variable outside for wider scope access
+
+  const showCancelButton = () => {
+    cancel = document.createElement('button');
+    cancel.textContent = 'Cancel';
+    cancel.onclick = () => {
+      uploadCanceled = true; // Set the cancel flag
+      outputElement.innerHTML = ''; // Clear the output display
+      cancel.remove(); // Remove the cancel button
+    };
+    inputElement.parentElement.appendChild(cancel);
+  };
 
   const pickedPromise = new Promise((resolve) => {
     inputElement.addEventListener('change', (e) => {
       outputElement.innerHTML = ''; // Clear previous output on new file selection
       uploadCanceled = false; // Reset the cancel flag
       resolve(e.target.files);
+      showCancelButton(); // Show the cancel button when files are picked
     });
   });
-
-  // Cancel button to stop the current upload
-  const cancel = document.createElement('button');
-  cancel.textContent = 'Cancel Current Upload';
-  cancel.onclick = () => {
-    uploadCanceled = true; // Set the cancel flag
-    outputElement.innerHTML = ''; // Clear the output display
-  };
-  inputElement.parentElement.appendChild(cancel);
 
   // Wait for the user to pick the files.
   const files = yield {
@@ -85,10 +89,10 @@ function* uploadFilesStep(inputId, outputId) {
     }
   };
 
-  cancel.remove();
   inputElement.disabled = false;
 
   if (!files) {
+    cancel && cancel.remove(); // Remove the cancel button if no files were picked
     return {
       response: {
         action: 'complete',
@@ -98,6 +102,7 @@ function* uploadFilesStep(inputId, outputId) {
 
   for (const file of files) {
     if (uploadCanceled) {
+      cancel && cancel.remove(); // Remove the cancel button if upload is canceled
       break; // Exit the loop if upload is canceled
     }
 
@@ -159,6 +164,8 @@ function* uploadFilesStep(inputId, outputId) {
       action: 'complete',
     }
   };
+  // Remove the cancel button after completion
+  cancel && cancel.remove();
 }
 
 
