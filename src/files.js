@@ -82,8 +82,6 @@ function* uploadFilesStep(inputId, outputId) {
   };
 
   cancel.remove();
-
-  // Disable the input element since further picks are not allowed.
   inputElement.disabled = true;
 
   if (!files) {
@@ -97,7 +95,13 @@ function* uploadFilesStep(inputId, outputId) {
   for (const file of files) {
     const li = document.createElement('li');
     li.append(span(file.name, {fontWeight: 'bold'}));
-    li.append(span(` (${file.size} bytes)`));
+    li.append(span(` (${file.size} bytes) `));
+
+    const progressBar = document.createElement('progress');
+    progressBar.max = file.size;
+    progressBar.value = 0;
+    li.appendChild(progressBar);
+
     const percent = span('0% done');
     li.appendChild(percent);
 
@@ -110,7 +114,7 @@ function* uploadFilesStep(inputId, outputId) {
       };
       reader.readAsArrayBuffer(file);
     });
-    // Wait for the data to be ready.
+
     let fileData = yield {
       promise: fileDataPromise,
       response: {
@@ -118,7 +122,6 @@ function* uploadFilesStep(inputId, outputId) {
       }
     };
 
-    // Use a chunked sending to avoid message size limits. See b/62115660.
     let position = 0;
     do {
       const length = Math.min(fileData.byteLength - position, MAX_PAYLOAD_SIZE);
@@ -138,6 +141,7 @@ function* uploadFilesStep(inputId, outputId) {
           100 :
           Math.round((position / fileData.byteLength) * 100);
       percent.textContent = `${percentDone}% done`;
+      progressBar.value = position;
 
     } while (position < fileData.byteLength);
   }
