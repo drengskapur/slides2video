@@ -94,16 +94,20 @@ function* uploadFilesStep(inputId, outputId) {
 
   for (const file of files) {
     const li = document.createElement('li');
-    li.append(span(file.name, {fontWeight: 'bold'}));
-    li.append(span(` (${file.size} bytes) `));
 
+    // Create and append the progress bar
     const progressBar = document.createElement('progress');
     progressBar.max = file.size;
     progressBar.value = 0;
     li.appendChild(progressBar);
 
-    const percent = span('0% done');
+    // Create and append the percentage span
+    const percent = span('0%');
     li.appendChild(percent);
+
+    // Append the file name
+    li.append(span(file.name, {fontWeight: 'bold'}));
+    li.append(span(` (${file.size} bytes) `));
 
     outputElement.appendChild(li);
 
@@ -140,7 +144,7 @@ function* uploadFilesStep(inputId, outputId) {
       let percentDone = fileData.byteLength === 0 ?
           100 :
           Math.round((position / fileData.byteLength) * 100);
-      percent.textContent = `${percentDone}% done`;
+      percent.textContent = `${percentDone}%`;
       progressBar.value = position;
 
     } while (position < fileData.byteLength);
@@ -153,6 +157,7 @@ function* uploadFilesStep(inputId, outputId) {
     }
   };
 }
+
 
 scope.google = scope.google || {};
 scope.google.colab = scope.google.colab || {};
