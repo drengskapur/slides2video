@@ -64,24 +64,14 @@ function* uploadFilesStep(inputId, outputId) {
     });
   });
 
-  const cancel = document.createElement('button');
-  inputElement.parentElement.appendChild(cancel);
-  cancel.textContent = 'Cancel upload';
-  const cancelPromise = new Promise((resolve) => {
-    cancel.onclick = () => {
-      resolve(null);
-    };
-  });
-
   // Wait for the user to pick the files.
   const files = yield {
-    promise: Promise.race([pickedPromise, cancelPromise]),
+    promise: pickedPromise,
     response: {
       action: 'starting',
     }
   };
 
-  cancel.remove();
   inputElement.disabled = true;
 
   if (!files) {
@@ -93,19 +83,19 @@ function* uploadFilesStep(inputId, outputId) {
   }
 
   for (const file of files) {
-    const li = document.createElement('li');
-
     // Create and append the progress bar
     const progressBar = document.createElement('progress');
     progressBar.max = file.size;
     progressBar.value = 0;
-    li.appendChild(progressBar);
+    outputElement.appendChild(progressBar);
 
     // Create and append the percentage span
     const percent = span(' 0% ');
-    li.appendChild(percent);
+    outputElement.appendChild(percent);
 
-    outputElement.appendChild(li);
+    // Append the file name
+    outputElement.appendChild(span(file.name, {fontWeight: 'bold'}));
+    outputElement.appendChild(span(` (${file.size} bytes) `));
 
     const fileDataPromise = new Promise((resolve) => {
       const reader = new FileReader();
