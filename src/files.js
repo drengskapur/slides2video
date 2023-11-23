@@ -93,10 +93,6 @@
       const percent = span(' 0% ');
       outputElement.appendChild(percent);
 
-      // Append the file name
-      outputElement.appendChild(span(file.name, { fontWeight: 'bold' }));
-      outputElement.appendChild(span(` (${file.size} bytes) `));
-
       const fileDataPromise = new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => {
