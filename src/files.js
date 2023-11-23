@@ -105,10 +105,6 @@ function* uploadFilesStep(inputId, outputId) {
     const percent = span(' 0% ');
     li.appendChild(percent);
 
-    // Append the file name
-    li.append(span(file.name, {fontWeight: 'bold'}));
-    li.append(span(` (${file.size} bytes) `));
-
     outputElement.appendChild(li);
 
     const fileDataPromise = new Promise((resolve) => {
