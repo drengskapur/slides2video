@@ -2,7 +2,7 @@
 (function (scope) {
 
     const MAX_PAYLOAD_SIZE = 100 * 1024;
-    const PYTHON_PROGRESS_BAR = document.querySelector('div.progress > div.progress-bar');
+    const PYTHON_PROGRESS_BAR = document.querySelector('.python-progress-bar');
 
     function span(text, styleAttributes = {}) {
         const element = document.createElement('span');
