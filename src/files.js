@@ -98,7 +98,7 @@
                         pythonProgress.style.visibility = 'visible';
                     }
             
-                    const pythonProgressBar = document.querySelector('div.python-progress > div.progress-bar');
+                    const pythonProgressBar = document.querySelector('div.python-progress div.progress-bar');
                     if (pythonProgressBar) {
                         pythonProgressBar.style.visibility = 'visible';
                         pythonProgressBar.style.width = percentDone + '%';
@@ -114,7 +114,7 @@
             pythonProgress.style.visibility = 'hidden';
         }
 
-        const pythonProgressBar = document.querySelector('div.python-progress > div.progress-bar');
+        const pythonProgressBar = document.querySelector('div.python-progress div.progress-bar');
         if (pythonProgressBar) {
             pythonProgressBar.style.visibility = 'hidden';
         }
