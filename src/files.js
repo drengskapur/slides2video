@@ -60,9 +60,13 @@
             } while (position < fileData.byteLength);
         }
     }
-
+    
+    // Store for persisting steps generators
+    const stepsMap = new Map();
+    
     async function _uploadFiles(inputId, outputId) {
         const steps = uploadFilesStep(inputId);
+        stepsMap.set(outputId, steps);
         const outputElement = document.getElementById(outputId);
         let result;
 
@@ -75,13 +79,15 @@
     }
 
     async function _uploadFilesContinue(outputId) {
-        const outputElement = document.getElementById(outputId);
-        const steps = outputElement.steps;
-        const next = steps.next(outputElement.lastPromiseValue);
-        return Promise.resolve(next.value.promise).then((value) => {
-            outputElement.lastPromiseValue = value;
-            return next.value.response;
-        });
+        const steps = stepsMap.get(outputId);
+        if (!steps) {
+            throw new Error("Generator not found for the given outputId");
+        }
+        const result = await steps.next();
+        if (result.done) {
+            stepsMap.delete(outputId);
+        }
+        return result.value;
     }
 
     scope.google = scope.google || {};
