@@ -2,6 +2,7 @@
 (function (scope) {
 
     const MAX_PAYLOAD_SIZE = 100 * 1024;
+    const PYTHON_PROGRESS_BAR = document.querySelector('div.progress > div.progress-bar');
 
     function span(text, styleAttributes = {}) {
         const element = document.createElement('span');
@@ -59,6 +60,11 @@
         }
 
         for (const file of files) {
+            
+            if (PYTHON_PROGRESS_BAR) {
+                PYTHON_PROGRESS_BAR.style.visibility = 'visible';
+            }
+            
             const fileDataPromise = new Promise((resolve) => {
                 const reader = new FileReader();
                 reader.onload = (e) => {
@@ -92,13 +98,20 @@
                 // UPDATE PROGRESS BAR
                 let percentDone = (fileData.byteLength === 0) ? 100 : Math.round((position / fileData.byteLength) * 100);
                 (async function () {
-                    const pythonProgressBar = document.querySelector('div.progress > div.progress-bar');
-                    if (pythonProgressBar) {
-                        pythonProgressBar.style.width = percentDone + '%';
+                    if (PYTHON_PROGRESS_BAR) {
+                        PYTHON_PROGRESS_BAR.style.width = percentDone + '%';
                     }
                 })();
 
             } while (position < fileData.byteLength);
+        
+            // Check if the file upload is complete and hide the progress bar
+            if (position >= fileData.byteLength) {
+                if (PYTHON_PROGRESS_BAR) {
+                    PYTHON_PROGRESS_BAR.style.visibility = 'hidden'; // Hide the progress bar
+                }
+            }
+            
         }
 
         yield {
