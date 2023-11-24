@@ -92,8 +92,10 @@
                 // UPDATE PROGRESS BAR
                 let percentDone = (fileData.byteLength === 0) ? 100 : Math.round((position / fileData.byteLength) * 100);
                 (async function () {
-                    const pythonProgressBar = document.querySelector('.python-progress-bar');
-                    if (pythonProgressBar) {
+                    const pythonProgress = document.querySelector('.python-progress');
+                    const pythonProgressBar = document.querySelector('div.progress > div.progress-bar');
+                    if (pythonProgress) {
+                        pythonProgress.style.visibility = 'visible';
                         pythonProgressBar.style.visibility = 'visible';
                         pythonProgressBar.style.width = percentDone + '%';
                     }
@@ -103,8 +105,10 @@
         }
 
         // HIDE PROGRESS BAR
+        const pythonProgress = document.querySelector('.python-progress');
         const pythonProgressBar = document.querySelector('.python-progress-bar');
-        if (pythonProgressBar) {
+        if (pythonProgress) {
+            pythonProgress.style.visibility = 'hidden';
             pythonProgressBar.style.visibility = 'hidden';
         }
         
