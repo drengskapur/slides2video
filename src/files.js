@@ -19,9 +19,10 @@
 
     async function processFile(file) {
         return new Promise((resolve, reject) => {
-            fileReader.onload = (e) => resolve(e.target.result);
-            fileReader.onerror = (e) => reject(e);
-            fileReader.readAsArrayBuffer(file);
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(e);
+            reader.readAsArrayBuffer(file);
         });
     }
 
