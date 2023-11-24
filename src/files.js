@@ -89,7 +89,7 @@
                     },
                 };
 
-                // UPDATE PROGRESS BAR
+                // UPDATE PROGRESS
                 let percentDone = (fileData.byteLength === 0) ? 100 : Math.round((position / fileData.byteLength) * 100);
                 (async function () {
                     const pythonProgress = document.querySelector('.python-progress');
@@ -104,12 +104,10 @@
             } while (position < fileData.byteLength);
         }
 
-        // HIDE PROGRESS BAR
+        // HIDE PROGRESS
         const pythonProgress = document.querySelector('.python-progress');
-        const pythonProgressBar = document.querySelector('.python-progress-bar');
         if (pythonProgress) {
             pythonProgress.style.visibility = 'hidden';
-            pythonProgressBar.style.visibility = 'hidden';
         }
         
         yield {
