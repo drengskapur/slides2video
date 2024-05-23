@@ -1,25 +1,25 @@
-import streamlit as st
-from pptx import Presentation
-from io import BytesIO
-from pptx.util import Inches
-from moviepy.editor import (
-    ImageClip,
-    AudioFileClip,
-    concatenate_videoclips,
-    CompositeAudioClip,
-)
+import base64
+import json
 import os
 import tempfile
-import pycountry
-from google.cloud import texttospeech
-from PIL import Image
+from io import BytesIO
 import subprocess
 from pathlib import Path
-import openai
-from gtts import gTTS, tts_langs
-import json
-import base64
 import shutil
+
+import openai
+import pycountry
+from gtts import gTTS
+from gtts.langs import tts_langs
+from moviepy.editor import (
+    AudioFileClip,
+    CompositeAudioClip,
+    ImageClip,
+    concatenate_videoclips,
+)
+from PIL import Image
+from google.cloud import texttospeech
+import streamlit as st
 
 # --- Constants ---
 DEFAULT_SLIDE_DURATION = 3
