@@ -147,11 +147,12 @@ class GoogleCloud_Engine(TTS):
                 return []
 
     def display_settings(self, slide_index):
-        google_credentials = st.text_area("Paste Google Cloud Credentials JSON:", key=f"google_creds")
-        if google_credentials and "google_credentials_content" not in st.session_state:
-            if self._set_credentials(google_credentials):
-                st.session_state["google_credentials_content"] = google_credentials
+        def update_google_credentials():
+            if self._set_credentials(st.session_state["google_credentials"]):
+                st.session_state["google_credentials_content"] = st.session_state["google_credentials"]
                 st.success("Google Cloud credentials validated!")
+
+        google_credentials = st.text_area("Paste Google Cloud Credentials JSON:", key=f"google_credentials", on_change=update_google_credentials)
 
         # Retrieve credentials from session state if they exist
         if "google_credentials_content" in st.session_state:
@@ -186,19 +187,22 @@ class OpenAI_Engine(TTS):
         return temp_file.name
 
     def display_settings(self, slide_index):
-        openai_api_key = st.text_input("Enter your OpenAI API Key:", key=f"openai_key")
-        if openai_api_key and "openai_api_key" not in st.session_state:
-            try:
-                openai.api_key = openai_api_key
-                openai.Engine.list()  # This will raise an exception if the key is invalid
-                st.session_state["openai_api_key"] = openai_api_key
-                st.success("OpenAI API key validated!")
+        def update_openai_api_key():
+            api_key = st.session_state["openai_api_key_input"]
+            if api_key:
+                try:
+                    openai.api_key = api_key
+                    openai.Engine.list()  
+                    st.session_state["openai_api_key"] = api_key
+                    st.success("OpenAI API key validated!")
 
-            except openai.error.AuthenticationError:
-                st.warning("Invalid OpenAI API key.")
-            except Exception as e:
-                st.warning("An error occurred while validating your API key.")
-                st.write(e)
+                except openai.error.AuthenticationError:
+                    st.warning("Invalid OpenAI API key.")
+                except Exception as e:
+                    st.warning("An error occurred while validating your API key.")
+                    st.write(e)
+
+        openai_api_key = st.text_input("Enter your OpenAI API Key:", key=f"openai_api_key_input", on_change=update_openai_api_key)
 
         # Only display voice options if the API key is valid
         if "openai_api_key" in st.session_state:
