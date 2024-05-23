@@ -1,6 +1,6 @@
 import streamlit as st
 from pptx import Presentation
-from pptx.io import BytesIO
+from io import BytesIO
 from pptx.util import Inches
 from moviepy.editor import (
     ImageClip,
