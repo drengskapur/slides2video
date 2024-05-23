@@ -2,7 +2,7 @@ google-cloud-texttospeech
 gTTS
 moviepy
 openai
-pdftopng
+pdf2png
 Pillow
 pycountry
 python-pptx
