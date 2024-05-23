@@ -320,10 +320,12 @@ class Gallery:
     def _display_slide_preview(self, slide, slide_index):
         """Displays a preview of the slide."""
         image_stream = BytesIO()
-        slide.pptx_slide.save(image_stream, format="png")
+        prs = Presentation()
+        prs.slides.add_slide(slide.pptx_slide)
+        prs.save(image_stream, format="png")
         image_stream.seek(0)
         st.image(Image.open(image_stream), width=200, use_column_width=True)
-
+    
         # Play Audio Button - Only show if audio exists
         if slide.audio_path:
             if st.button(f"Play Audio {slide_index + 1}"):
