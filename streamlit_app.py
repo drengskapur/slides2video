@@ -502,7 +502,7 @@ def create_audio(text, voice_name, temp_dir, slide_index, tts_engine, credential
         elif tts_engine == "Google Cloud":
             audio_path = GoogleCloud_Engine().synthesize_speech(text, temp_dir, slide_index, voice_name, language, speaking_rate, pitch, credentials_content)
         elif tts_engine == "OpenAI":
-            audio_path = OpenAI_Engine().synthesize_speech(text, temp_dir, slide_index, voice_name, credentials_content, model)  # Pass credentials_content
+            audio_path = OpenAI_Engine().synthesize_speech(text, temp_dir, slide_index, voice_name, credentials_content, model)
         else:
             st.error("Invalid TTS engine selected.")
             return None
