@@ -335,13 +335,31 @@ class Gallery:
             self.add_new_slide(selected_layout_index)
             st.experimental_rerun()
 
-    def _display_slide_preview(self, slide, slide_index):
+You are absolutely correct! The Presentation.save() method doesn't have a format argument. You need to convert the presentation to a PDF first and then save that as a PNG. Here's how you can fix that:
+
+def _display_slide_preview(self, slide, slide_index):
         """Displays a preview of the slide."""
         image_stream = BytesIO()
         prs = Presentation()
-        # The fix: use the slide layout directly
-        prs.slides.add_slide(slide.pptx_slide.slide_layout)  
-        prs.save(image_stream, format="png")
+
+        # Create a temporary file to store the PDF
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
+            prs.slides.add_slide(slide.pptx_slide.slide_layout)  
+            prs.save(temp_pdf.name, format="pdf")
+
+            # Convert the PDF to PNG
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_png:
+                cmd = [
+                    "convert",  # ImageMagick's command for conversion
+                    temp_pdf.name, 
+                    temp_png.name 
+                ]
+                subprocess.run(cmd, check=True)
+
+                # Load the PNG into the image stream
+                with open(temp_png.name, "rb") as png_file:
+                    image_stream.write(png_file.read())
+
         image_stream.seek(0)
         st.image(Image.open(image_stream), width=200, use_column_width=True)
 
