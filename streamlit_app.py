@@ -36,6 +36,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+
 # --- Abstract Base Class for TTS Engines ---
 class TTS(ABC):
     @abstractmethod
@@ -60,6 +61,7 @@ class TTS(ABC):
         except KeyError:
             return "Unknown Language"
 
+
 # --- TTS Engine Implementations ---
 class GTTS_Engine(TTS):
     def synthesize_speech(self, text, temp_dir, slide_index, language="en"):
@@ -73,6 +75,7 @@ class GTTS_Engine(TTS):
         language_code = st.selectbox("Select Language:", options=language_options, key=f"gtts_language_{slide_index}")
         st.write(f"Language: {gTTS.tts_langs().get(language_code)}")
         return {"language": language_code}  # Return settings as a dictionary
+
 
 class GoogleCloud_Engine(TTS):
     def __init__(self):
@@ -173,9 +176,10 @@ class GoogleCloud_Engine(TTS):
                 st.warning("No voices found. Try different credentials or language.")
         return {}
 
+
 class OpenAI_Engine(TTS):
-    def synthesize_speech(self, text, voice_name, api_key, model="tts-1-hd"):
-        openai.api_key = api_key
+    def synthesize_speech(self, text, temp_dir, slide_index, voice_name, api_key, model="tts-1-hd"):
+        openai.api_key = api_key  # Use API key from settings
         response = openai.audio.speech.create(input=text, voice=voice_name, model=model)
         with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_file:
             temp_file.write(response.content)
@@ -214,6 +218,7 @@ class OpenAI_Engine(TTS):
             model = st.selectbox("Select Model:", ["tts-1", "tts-1-hd"], key=f"openai_model_{slide_index}")
             return {"voice_name": voice_name, "api_key": openai_api_key, "model": model}
         return {}
+
 
 # --- UI Components ---
 class Project:
@@ -255,6 +260,7 @@ class Project:
         except Exception as e:
             st.error(f"Error saving project: {e}")
 
+
 class Slide:
     def __init__(self, pptx_slide=None):
         self.pptx_slide = pptx_slide or self._create_new_slide()
@@ -284,6 +290,7 @@ class Slide:
         prs = Presentation()
         blank_layout = prs.slide_layouts[6]
         return prs.slides.add_slide(blank_layout)
+
 
 class Gallery:
     def __init__(self, project):
@@ -326,7 +333,6 @@ class Gallery:
     def slide_to_image(self, slide, slide_index, temp_dir):
         """Saves a slide as an image."""
         image_path = os.path.join(temp_dir, f"slide_{slide_index}.png")
-        # Corrected to use slide.pptx_slide.save
         slide.pptx_slide.save(image_path, format="png")
         return image_path
 
@@ -362,6 +368,7 @@ class Gallery:
             raise RuntimeError(
                 f"Error converting {input_pptx} to PDF: {e}"
             ) from e
+
 
 class Editor:
     def __init__(self, project, slide_index):
@@ -461,7 +468,7 @@ class Editor:
                         if st.session_state["tts_engine"] == "Google Cloud":
                             settings["credentials_content"] = st.session_state.get("google_credentials_content")
                         elif st.session_state["tts_engine"] == "OpenAI":
-                            settings["api_key"] = st.session_state.get("openai_api_key")
+                            settings["api_key"] = st.session_state.get("openai_api_key")  # Pass API key
 
                         audio_path = selected_tts_engine.synthesize_speech(
                             text=self.slide.voiceover,
@@ -480,6 +487,7 @@ class Editor:
 
         return {}  # Return empty dictionary if no engine is selected
 
+
 # --- Cached function to create audio ---
 @st.cache_data
 def create_audio(text, voice_name, temp_dir, slide_index, tts_engine, credentials_content=None, language="en", speaking_rate=1.0, pitch=0.0, model="tts-1-hd", **kwargs):
@@ -487,16 +495,21 @@ def create_audio(text, voice_name, temp_dir, slide_index, tts_engine, credential
         if tts_engine == "gTTS":
             audio_path = GTTS_Engine().synthesize_speech(text, temp_dir, slide_index, language=language)
         elif tts_engine == "Google Cloud":
-            audio_path = GoogleCloud_Engine().synthesize_speech(text, temp_dir, slide_index, voice_name, language, speaking_rate, pitch)
+            audio_path = GoogleCloud_Engine().synthesize_speech(text, temp_dir, slide_index, voice_name, language, speaking_rate, pitch, credentials_content)
         elif tts_engine == "OpenAI":
-            audio_path = OpenAI_Engine().synthesize_speech(text, voice_name, credentials_content, model)
+            audio_path = OpenAI_Engine().synthesize_speech(text, temp_dir, slide_index, voice_name, credentials_content, model)  # Pass credentials_content
         else:
             st.error("Invalid TTS engine selected.")
             return None
     else:
         audio_path = os.path.join(temp_dir, f"temp_audio_{slide_index}.mp3")
-        AudioFileClip(Gallery.make_chunks(self=Gallery, size=[1], chunk_size=0.1)[0]).write_audiofile(audio_path)
+        try:
+            AudioFileClip(Gallery.make_chunks(size=[1], chunk_size=0.1)[0]).write_audiofile(audio_path) 
+        except Exception as e:
+            st.error(f"Error creating silent audio: {e}")
+            return None
     return audio_path
+
 
 # --- Cached Video Generation Function ---
 @st.cache_data
@@ -518,10 +531,12 @@ def _create_video_from_data(slides_data, slide_duration, gap_duration, output_fi
     slides_to_process = slides_data if end_slide_index is None else slides_data[: end_slide_index + 1]
     for i, slide_data in enumerate(slides_to_process):
         slide = slide_data["slide"]
-        image_path = Gallery.slide_to_image(self=Gallery, slide=slide, slide_index=i, temp_dir=temp_dir)
+        image_path = Gallery.slide_to_image(slide=slide, slide_index=i, temp_dir=temp_dir)
         image_clips.append(ImageClip(image_path))
         text = slide_data.get("voiceover", "")
         audio_path = create_audio(text, voice_name, temp_dir, i, tts_engine, credentials_content, **slide_data["tts_settings"])
+        if audio_path is None: # Handle potential error in create_audio
+            return None
         audio_clip = AudioFileClip(audio_path)
         audio_clips.append(audio_clip)
         actual_slide_duration = max(slide_duration, audio_clip.duration)
@@ -567,13 +582,16 @@ def main():
     if "tts_engine" not in st.session_state:
         st.session_state["tts_engine"] = "gTTS"
 
+    def update_tts_engine():
+        st.session_state["tts_engine"] = st.session_state["tts_engine_selection"] 
+
     tts_engine_name = st.radio(
         "Select TTS Engine:",
         ["gTTS", "Google Cloud", "OpenAI"],
-        key="tts_engine",
-        horizontal=True
+        key="tts_engine_selection",
+        horizontal=True,
+        on_change=update_tts_engine
     )
-    st.session_state["tts_engine"] = tts_engine_name
 
     # --- PowerPoint Upload OR New Presentation ---
     uploaded_pptx = st.file_uploader("Upload your PowerPoint presentation (optional)", type=["pptx"])
@@ -684,6 +702,7 @@ def main():
                         st.error("PDF conversion failed. Please check the console for errors.")
                 except Exception as e:
                     st.error(f"An error occurred during PDF conversion: {e}")
+
 
 # --- Run the App ---
 if __name__ == "__main__":
