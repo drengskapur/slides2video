@@ -24,14 +24,6 @@ DEFAULT_SLIDE_DURATION = 3
 DEFAULT_OUTPUT_FILENAME = "output_video.mp4"
 DEFAULT_GAP_BETWEEN_SLIDES = 1  # seconds
 
-# --- Page Configuration ---
-st.set_page_config(
-    page_title="Slides2Video",
-    page_icon="🎬",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
 # --- Abstract Base Class for TTS Engines ---
 class TTS(ABC):
     @abstractmethod
@@ -335,25 +327,9 @@ class Gallery:
 
     def _display_slide_preview(self, slide, slide_index):
         """Displays a preview of the slide."""
-        prs = Presentation()
-        prs.slides.add_slide(slide.pptx_slide)
-
-        # Create a temporary PPTX file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pptx") as temp_pptx:
-            prs.save(temp_pptx.name)
-
-            # Convert the PPTX to PDF using LibreOffice
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
-                self.convert_pptx_to_pdf(Path(temp_pptx.name), Path(temp_pdf.name))
-
-                # Convert the PDF to PNG
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_png:
-                    images = pdf2image.convert_from_path(temp_pdf.name, dpi=300)
-                    resized_image = self.resize_image_to_even_dimensions(images[0])
-                    resized_image.save(temp_png.name, "PNG")
-
-                    # Display the PNG preview
-                    st.image(Image.open(temp_png.name), width=200, use_column_width=True)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            image_path = self.slide_to_image(slide, slide_index, temp_dir)
+            st.image(Image.open(image_path), width=200, use_column_width=True)
 
         # Play Audio Button - Only show if audio exists
         if slide.audio_path:
@@ -367,13 +343,32 @@ class Gallery:
 
     def slide_to_image(self, slide, slide_index, temp_dir):
         """Saves a slide as an image."""
-        image_path = os.path.join(temp_dir, f"slide_{slide_index}.png")
-        slide.pptx_slide.save(image_path, format="png")
-        return image_path
+        prs = Presentation()
+        prs.slides.add_slide(slide.pptx_slide)
+
+        # Create temporary PPTX file
+        temp_pptx_path = os.path.join(temp_dir, f"temp_slide_{slide_index}.pptx")
+        prs.save(temp_pptx_path)
+
+        # Convert PPTX to PDF using LibreOffice
+        temp_pdf_path = os.path.join(temp_dir, f"temp_slide_{slide_index}.pdf")
+        self.convert_pptx_to_pdf(Path(temp_pptx_path), Path(temp_pdf_path))
+
+        # Convert PDF to PNG
+        temp_png_path = os.path.join(temp_dir, f"temp_slide_{slide_index}.png")
+        self.convert_pdf_to_png(temp_pdf_path, temp_png_path)
+
+        return temp_png_path
 
     def make_chunks(self, size, chunk_size):
         """Splits a sequence into chunks."""
         return [size[i : i + chunk_size] for i in range(0, len(size), chunk_size)]
+
+    def convert_pdf_to_png(self, pdf_path, png_path, dpi=300):
+        """Converts a PDF to a PNG image."""
+        images = pdf2image.convert_from_path(pdf_path, dpi=dpi)
+        resized_image = self.resize_image_to_even_dimensions(images[0])
+        resized_image.save(png_path, "PNG")
 
     def convert_pptx_to_pdf(self, input_pptx: Path):
         """Converts a PPTX file to PDF using LibreOffice."""
@@ -575,6 +570,14 @@ def _create_video_from_data(slides_data, slide_duration, gap_duration, output_fi
 
 # --- Main Streamlit App ---
 def main():
+    # --- Page Configuration ---
+    st.set_page_config(
+        page_title="Slides2Video",
+        page_icon="🎬",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+
     # --- Project Management ---
     if "project" not in st.session_state:
         st.session_state["project"] = Project()
