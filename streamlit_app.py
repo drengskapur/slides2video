@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 import shutil
 from abc import ABC, abstractmethod
+from datetime import date, time
 
 import openai
 import pycountry
@@ -22,6 +23,7 @@ from pptx import Presentation
 from pptx.util import Inches
 from google.cloud import texttospeech
 import streamlit as st
+import pandas as pd
 
 # --- Constants ---
 DEFAULT_SLIDE_DURATION = 3
@@ -337,7 +339,8 @@ class Gallery:
         """Displays a preview of the slide."""
         image_stream = BytesIO()
         prs = Presentation()
-        prs.slides.add_slide(slide.pptx_slide)
+        # The fix: use the slide layout directly
+        prs.slides.add_slide(slide.pptx_slide.slide_layout)  
         prs.save(image_stream, format="png")
         image_stream.seek(0)
         st.image(Image.open(image_stream), width=200, use_column_width=True)
