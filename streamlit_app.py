@@ -368,7 +368,7 @@ def main():
     uploaded_pptx = st.file_uploader("Upload your PowerPoint presentation", type=["pptx"])
     if uploaded_pptx:
         try:
-            prs = pptx.Presentation(uploaded_pptx)
+            prs = Presentation(uploaded_pptx)
 
             # --- Initialize Slide Data ---
             if "slides_data" not in st.session_state:
