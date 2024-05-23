@@ -438,7 +438,7 @@ class Gallery:
 
     def convert_pptx_to_pdf(self, input_pptx: Path):
         """Converts a PPTX file to PDF using LibreOffice."""
-        output_pdf_path: Path = Path("downloads") / f"{input_pptx.stem}.pdf"
+        output_pdf_path: Path = Path("downloads") / f"{input_pptx.stem}.pdf"  # Construct output path here
         try:
             Path("downloads").mkdir(parents=True, exist_ok=True)
             if shutil.which("libreoffice") is None:
