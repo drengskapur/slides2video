@@ -122,7 +122,7 @@ class GoogleCloud_Engine(TTS):
                 st.error(f"Error fetching languages: {e}")
                 return []
 
-    @st.cache_data(show_spinner=False)  # Cache but don't show spinner 
+    @st.cache_data(show_spinner=False)  # Cache but don't show spinner
     def _get_google_tts_voices(self, language_code="en-US"):
         """Gets available voices for a specific language code."""
         with tempfile.NamedTemporaryFile(mode="w", delete=False) as creds_file:
@@ -139,40 +139,39 @@ class GoogleCloud_Engine(TTS):
                 ]
                 os.remove(creds_file.name)
                 return voice_options
-
             except Exception as e:
                 st.error(f"Error initializing Google TTS: {e}")
                 return []
 
     def display_settings(self, slide_index):
-        google_credentials = st.text_area("Paste Google Cloud Credentials JSON:", key=f"google_creds_{slide_index}")
-        settings = {}  # Initialize empty settings dictionary
-
-        if google_credentials:
+        google_credentials = st.text_area("Paste Google Cloud Credentials JSON:", key=f"google_creds")
+        if google_credentials and "google_credentials_content" not in st.session_state:
             if self._set_credentials(google_credentials):
+                st.session_state["google_credentials_content"] = google_credentials
                 st.success("Google Cloud credentials validated!")
 
-                language_options = self._get_language_options()
-                language_code = st.selectbox("Select Language:", options=language_options, key=f"google_language_{slide_index}")
-                language_name = self.get_language_name_from_code(language_code)
-                st.write(f"Language: {language_name}")
-                
-                voice_options = self._get_google_tts_voices(language_code)
-                if voice_options:
-                    selected_voice = st.selectbox("Select a voice:", [voice[0] for voice in voice_options], key=f"google_voice_{slide_index}")
-                    voice_name = dict(voice_options)[selected_voice]
-                    speaking_rate = st.slider("Speaking Rate:", min_value=0.25, max_value=4.0, value=1.0, step=0.25, key=f"speaking_rate_{slide_index}")
-                    pitch = st.slider("Pitch:", min_value=-20.0, max_value=20.0, value=0.0, step=1.0, key=f"pitch_{slide_index}")
+        # Retrieve credentials from session state if they exist
+        if "google_credentials_content" in st.session_state:
+            self.credentials_content = st.session_state["google_credentials_content"]
+            language_options = self._get_language_options()
+            language_code = st.selectbox("Select Language:", options=language_options, key=f"google_language_{slide_index}")
+            language_name = self.get_language_name_from_code(language_code)
+            st.write(f"Language: {language_name}")
 
-                    # Update settings dictionary
-                    settings.update(
-                        {"voice_name": voice_name, "language_code": language_code, 
-                         "speaking_rate": speaking_rate, "pitch": pitch}
-                    )
-                else:
-                    st.warning("No voices found. Try different credentials or language.")
+            voice_options = self._get_google_tts_voices(language_code)
+            if voice_options:
+                selected_voice = st.selectbox("Select a voice:", [voice[0] for voice in voice_options], key=f"google_voice_{slide_index}")
+                voice_name = dict(voice_options)[selected_voice]
+                st.session_state["selected_voice_name"] = voice_name
+                speaking_rate = st.slider("Speaking Rate:", min_value=0.25, max_value=4.0, value=1.0, step=0.25, key=f"speaking_rate_{slide_index}")
+                pitch = st.slider("Pitch:", min_value=-20.0, max_value=20.0, value=0.0, step=1.0, key=f"pitch_{slide_index}")
 
-        return settings 
+                # Update settings dictionary
+                return {"voice_name": voice_name, "language_code": language_code,
+                        "speaking_rate": speaking_rate, "pitch": pitch}
+            else:
+                st.warning("No voices found. Try different credentials or language.")
+        return {}
 
 class OpenAI_Engine(TTS):
     def synthesize_speech(self, text, voice_name, api_key, model="tts-1-hd"):
@@ -183,38 +182,38 @@ class OpenAI_Engine(TTS):
         return temp_file.name
 
     def display_settings(self, slide_index):
-        openai_api_key = st.text_input("Enter your OpenAI API Key:", key=f"openai_key_{slide_index}")
-        settings = {}  # Initialize an empty settings dictionary
-        if openai_api_key:
+        openai_api_key = st.text_input("Enter your OpenAI API Key:", key=f"openai_key")
+        if openai_api_key and "openai_api_key" not in st.session_state:
             try:
                 openai.api_key = openai_api_key
                 openai.Engine.list()  # This will raise an exception if the key is invalid
+                st.session_state["openai_api_key"] = openai_api_key
                 st.success("OpenAI API key validated!")
-
-                # If the key is valid, get available voices (not directly provided by the API)
-                voice_name = st.selectbox(
-                    "Select a voice:",
-                    [
-                        "alloy",
-                        "echo",
-                        "fable",
-                        "onyx",
-                        "nova",
-                        "shimmer",
-                    ],
-                    key=f"openai_voice_{slide_index}",
-                )
-                model = st.selectbox("Select Model:", ["tts-1", "tts-1-hd"], key=f"openai_model_{slide_index}")
-
-                # Update the settings dictionary
-                settings.update({"voice_name": voice_name, "api_key": openai_api_key, "model": model})
 
             except openai.error.AuthenticationError:
                 st.warning("Invalid OpenAI API key.")
             except Exception as e:
                 st.warning("An error occurred while validating your API key.")
                 st.write(e)
-        return settings
+
+        # Only display voice options if the API key is valid
+        if "openai_api_key" in st.session_state:
+            voice_name = st.selectbox(
+                "Select a voice:",
+                [
+                    "alloy",
+                    "echo",
+                    "fable",
+                    "onyx",
+                    "nova",
+                    "shimmer",
+                ],
+                key=f"openai_voice_{slide_index}",
+            )
+            st.session_state["selected_voice_name"] = voice_name
+            model = st.selectbox("Select Model:", ["tts-1", "tts-1-hd"], key=f"openai_model_{slide_index}")
+            return {"voice_name": voice_name, "api_key": openai_api_key, "model": model}
+        return {}
 
 # --- UI Components ---
 class Project:
@@ -279,7 +278,7 @@ class Slide:
             "audio_path": self.audio_path,
             "tts_settings": self.tts_settings,
         }
-    
+
     def _create_new_slide(self):
         """Creates a new blank slide and returns it."""
         prs = Presentation()
@@ -327,7 +326,8 @@ class Gallery:
     def slide_to_image(self, slide, slide_index, temp_dir):
         """Saves a slide as an image."""
         image_path = os.path.join(temp_dir, f"slide_{slide_index}.png")
-        slide.save(image_path, format="png")
+        # Corrected to use slide.pptx_slide.save
+        slide.pptx_slide.save(image_path, format="png")
         return image_path
 
     def make_chunks(self, size, chunk_size):
@@ -380,7 +380,7 @@ class Editor:
                     st.session_state["editing_slide"] = False
                     st.experimental_rerun()
 
-def _display_slide_content(self):
+    def _display_slide_content(self):
         """Displays and allows editing of slide content."""
         st.write(f"**Slide {self.slide_index + 1}**")
         image_stream = BytesIO()
@@ -441,46 +441,53 @@ def _display_slide_content(self):
     def _display_tts_options(self):
         """Displays TTS engine selection and settings."""
         st.write("**Voiceover Settings:**")
-        tts_engine_key = f"tts_engine_dialog_{self.slide_index}"
-        tts_engine_name = st.radio(
-            "", ["gTTS", "Google Cloud", "OpenAI"], key=tts_engine_key, horizontal=True
-        )
 
-        tts_engines = {
-            "gTTS": GTTS_Engine(),
-            "Google Cloud": GoogleCloud_Engine(),
-            "OpenAI": OpenAI_Engine(),
-        }
-        selected_tts_engine = tts_engines[tts_engine_name]
+        # --- Access Selected Engine ---
+        selected_tts_engine = None
+        if st.session_state["tts_engine"] == "gTTS":
+            selected_tts_engine = GTTS_Engine()
+        elif st.session_state["tts_engine"] == "Google Cloud":
+            selected_tts_engine = GoogleCloud_Engine()
+        elif st.session_state["tts_engine"] == "OpenAI":
+            selected_tts_engine = OpenAI_Engine()
 
-        settings = selected_tts_engine.display_settings(self.slide_index)
+        # --- Display Engine Settings ---
+        if selected_tts_engine:
+            settings = selected_tts_engine.display_settings(self.slide_index)
 
-        if st.button(f"Generate Voiceover {self.slide_index + 1}"):
-            with st.spinner("Generating voiceover..."):
-                try:
-                    audio_path = selected_tts_engine.synthesize_speech(
-                        text=self.slide.voiceover,
-                        temp_dir="temp",
-                        slide_index=self.slide_index,
-                        **settings
-                    )
+            if st.button(f"Generate Voiceover {self.slide_index + 1}"):
+                with st.spinner("Generating voiceover..."):
+                    try:
+                        if st.session_state["tts_engine"] == "Google Cloud":
+                            settings["credentials_content"] = st.session_state.get("google_credentials_content")
+                        elif st.session_state["tts_engine"] == "OpenAI":
+                            settings["api_key"] = st.session_state.get("openai_api_key")
 
-                    self.slide.audio_path = audio_path
-                    st.success("Voiceover generated!")
-                    st.audio(audio_path, format="audio/mp3")
-                except Exception as e:
-                    st.error(f"Error generating voiceover: {e}")
+                        audio_path = selected_tts_engine.synthesize_speech(
+                            text=self.slide.voiceover,
+                            temp_dir="temp",
+                            slide_index=self.slide_index,
+                            **settings
+                        )
 
-        return settings
+                        self.slide.audio_path = audio_path
+                        st.success("Voiceover generated!")
+                        st.audio(audio_path, format="audio/mp3")
+                    except Exception as e:
+                        st.error(f"Error generating voiceover: {e}")
+
+            return settings
+
+        return {}  # Return empty dictionary if no engine is selected
 
 # --- Cached function to create audio ---
-@st.cache_data 
-def create_audio(text, voice_name, temp_dir, slide_index, tts_engine, credentials_content=None, language_code="en-US", speaking_rate=1.0, pitch=0.0, model="tts-1-hd", **kwargs):
+@st.cache_data
+def create_audio(text, voice_name, temp_dir, slide_index, tts_engine, credentials_content=None, language="en", speaking_rate=1.0, pitch=0.0, model="tts-1-hd", **kwargs):
     if text:
         if tts_engine == "gTTS":
-            audio_path = GTTS_Engine().synthesize_speech(text, temp_dir, slide_index, language_code)
+            audio_path = GTTS_Engine().synthesize_speech(text, temp_dir, slide_index, language=language)
         elif tts_engine == "Google Cloud":
-            audio_path = GoogleCloud_Engine().synthesize_speech(text, temp_dir, slide_index, voice_name, language_code, speaking_rate, pitch)
+            audio_path = GoogleCloud_Engine().synthesize_speech(text, temp_dir, slide_index, voice_name, language, speaking_rate, pitch)
         elif tts_engine == "OpenAI":
             audio_path = OpenAI_Engine().synthesize_speech(text, voice_name, credentials_content, model)
         else:
@@ -492,7 +499,7 @@ def create_audio(text, voice_name, temp_dir, slide_index, tts_engine, credential
     return audio_path
 
 # --- Cached Video Generation Function ---
-@st.cache_data 
+@st.cache_data
 def generate_video(slides_data, slide_duration, gap_duration, output_filename, voice_name, credentials_content, tts_engine, end_slide_index=None):
     try:
         slide_duration = int(slide_duration)
@@ -528,9 +535,9 @@ def _create_video_from_data(slides_data, slide_duration, gap_duration, output_fi
     final_video.write_videofile(video_path, fps=24)
     return video_path
 
+
 # --- Main Streamlit App ---
 def main():
-    # --- App Title --- 
     st.title("PowerPoint to Video Converter")
 
     # --- Project Management ---
@@ -555,6 +562,18 @@ def main():
                 st.experimental_rerun()  # Rerun to reflect loaded data
             except FileNotFoundError:
                 st.error(f"Project '{project.project_name}' not found.")
+
+    # --- TTS Engine Selection --- 
+    if "tts_engine" not in st.session_state:
+        st.session_state["tts_engine"] = "gTTS"
+
+    tts_engine_name = st.radio(
+        "Select TTS Engine:",
+        ["gTTS", "Google Cloud", "OpenAI"],
+        key="tts_engine",
+        horizontal=True
+    )
+    st.session_state["tts_engine"] = tts_engine_name
 
     # --- PowerPoint Upload OR New Presentation ---
     uploaded_pptx = st.file_uploader("Upload your PowerPoint presentation (optional)", type=["pptx"])
@@ -597,15 +616,27 @@ def main():
     # --- Video Generation ---
     st.header("Create Full Video")
     if st.button("Generate Video"):
+        # Access settings from session state
+        voice_name = st.session_state.get("selected_voice_name")
+        credentials_content = st.session_state.get("google_credentials_content")  # For Google Cloud
+        tts_engine = st.session_state.get("tts_engine", "gTTS")
+
         with st.spinner("Creating video..."):
             video_path = generate_video(
-                [{"slide": slide.pptx_slide, "voiceover": slide.voiceover, "audio_path": slide.audio_path, "tts_settings": slide.tts_settings} for slide in project.slides],
+                [
+                    {
+                        "slide": slide.pptx_slide,
+                        "voiceover": slide.voiceover,
+                        "audio_path": slide.audio_path,
+                        "tts_settings": slide.tts_settings
+                    } for slide in project.slides
+                ],
                 project.slide_duration,
                 project.gap_duration,
                 project.output_filename,
-                st.session_state.get("selected_voice_name"),
-                st.session_state.get("credentials_content"),
-                st.session_state.get("tts_engine", "gTTS"),
+                voice_name,
+                credentials_content,
+                tts_engine,
             )
 
             if video_path:
