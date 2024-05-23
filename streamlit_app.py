@@ -335,8 +335,6 @@ class Gallery:
             self.add_new_slide(selected_layout_index)
             st.experimental_rerun()
 
-You are absolutely correct! The Presentation.save() method doesn't have a format argument. You need to convert the presentation to a PDF first and then save that as a PNG. Here's how you can fix that:
-
 def _display_slide_preview(self, slide, slide_index):
         """Displays a preview of the slide."""
         image_stream = BytesIO()
