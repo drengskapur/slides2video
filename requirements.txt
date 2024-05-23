@@ -1,0 +1,8 @@
+streamlit
+python-pptx
+moviepy
+google-cloud-texttospeech
+Pillow
+openai
+gTTS
+pycountry
