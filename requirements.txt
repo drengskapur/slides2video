@@ -2,7 +2,7 @@ streamlit
 python-pptx
 moviepy
 google-cloud-texttospeech
-pdf2png
+pdftopng
 Pillow
 openai
 gTTS
