@@ -17,6 +17,8 @@ from moviepy.editor import (
     concatenate_videoclips,
 )
 from PIL import Image
+from pptx import Presentation
+from pptx.util import Inches
 from google.cloud import texttospeech
 import streamlit as st
 
@@ -366,7 +368,7 @@ def main():
     uploaded_pptx = st.file_uploader("Upload your PowerPoint presentation", type=["pptx"])
     if uploaded_pptx:
         try:
-            prs = Presentation(uploaded_pptx)
+            prs = pptx.Presentation(uploaded_pptx)
 
             # --- Initialize Slide Data ---
             if "slides_data" not in st.session_state:
