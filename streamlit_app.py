@@ -227,7 +227,7 @@ class OpenAI_Engine(TTS):
 class Project:
     def __init__(self, project_name="MyProject"):
         self.project_name = project_name
-        self.slides = [Slide()] # Initialize with a blank slide
+        self.slides = []  # Initialize with no slides
         self.slide_duration = DEFAULT_SLIDE_DURATION
         self.gap_duration = DEFAULT_GAP_BETWEEN_SLIDES
         self.output_filename = DEFAULT_OUTPUT_FILENAME
@@ -288,11 +288,11 @@ class Slide:
             "tts_settings": self.tts_settings,
         }
 
-    def _create_new_slide(self):
-        """Creates a new blank slide and returns it."""
+    def _create_new_slide(self, layout_index=6):  # Default to Blank layout
+        """Creates a new slide with the specified layout index."""
         prs = Presentation()
-        blank_layout = prs.slide_layouts[6]
-        return prs.slides.add_slide(blank_layout)
+        slide_layout = prs.slide_layouts[layout_index]
+        return prs.slides.add_slide(slide_layout)
 
 
 class Gallery:
@@ -312,9 +312,25 @@ class Gallery:
                             st.session_state["edit_slide_index"] = i
                             st.experimental_rerun()
 
-        # --- Add Slide Button ---
+        # --- Add Slide Section ---
+        st.header("Add New Slide")
+        layout_names = [
+            "Title Slide",
+            "Title and Content",
+            "Section Header",
+            "Two Content",
+            "Comparison",
+            "Title Only",
+            "Blank",
+            "Content with Caption",
+            "Picture with Caption",
+        ]
+        selected_layout_name = st.selectbox("Select Slide Layout:", layout_names)
+        selected_layout_index = layout_names.index(selected_layout_name)
+        
+
         if st.button("Add Slide"):
-            self.add_new_slide()
+            self.add_new_slide(selected_layout_index)
             st.experimental_rerun()
 
     def _display_slide_preview(self, slide, slide_index):
@@ -325,15 +341,16 @@ class Gallery:
         prs.save(image_stream, format="png")
         image_stream.seek(0)
         st.image(Image.open(image_stream), width=200, use_column_width=True)
-    
+
         # Play Audio Button - Only show if audio exists
         if slide.audio_path:
             if st.button(f"Play Audio {slide_index + 1}"):
                 st.audio(slide.audio_path, format="audio/mp3")
 
-    def add_new_slide(self):
-        """Adds a new blank slide to the project."""
-        self.project.slides.append(Slide())
+    def add_new_slide(self, layout_index):
+        """Adds a new slide with the specified layout index to the project."""
+        self.project.slides.append(Slide(pptx_slide=None))  # Create a blank slide
+        self.project.slides[-1]._create_new_slide(layout_index=layout_index)
 
     def slide_to_image(self, slide, slide_index, temp_dir):
         """Saves a slide as an image."""
@@ -401,7 +418,7 @@ class Editor:
         prs.save(image_stream, format="png")
         image_stream.seek(0)
         st.image(Image.open(image_stream), width=600)
-    
+
         with st.expander(f"Edit Slide {self.slide_index + 1} Content", expanded=True):
             for shape_index, shape in enumerate(self.slide.pptx_slide.shapes):
                 if shape.has_text_frame:
@@ -511,7 +528,7 @@ def create_audio(text, voice_name, temp_dir, slide_index, tts_engine, credential
     else:
         audio_path = os.path.join(temp_dir, f"temp_audio_{slide_index}.mp3")
         try:
-            AudioFileClip(Gallery.make_chunks(size=[1], chunk_size=0.1)[0]).write_audiofile(audio_path) 
+            AudioFileClip(Gallery.make_chunks(size=[1], chunk_size=0.1)[0]).write_audiofile(audio_path)
         except Exception as e:
             st.error(f"Error creating silent audio: {e}")
             return None
@@ -583,12 +600,12 @@ def main():
             except FileNotFoundError:
                 st.error(f"Project '{project.project_name}' not found.")
 
-    # --- TTS Engine Selection --- 
+    # --- TTS Engine Selection ---
     if "tts_engine" not in st.session_state:
         st.session_state["tts_engine"] = "gTTS"
 
     def update_tts_engine():
-        st.session_state["tts_engine"] = st.session_state["tts_engine_selection"] 
+        st.session_state["tts_engine"] = st.session_state["tts_engine_selection"]
 
     tts_engine_name = st.radio(
         "Select TTS Engine:",
@@ -619,7 +636,7 @@ def main():
     project.gap_duration = st.number_input(
         "Gap Between Slides (seconds)", min_value=0, value=project.gap_duration
     )
-    project.output_filename = st.text_input("Output Video Filename", value=project.output_filename) 
+    project.output_filename = st.text_input("Output Video Filename", value=project.output_filename)
 
     # --- Slide Gallery ---
     gallery = Gallery(project)
