@@ -18,7 +18,7 @@ from moviepy.editor import (
     ImageClip,
     concatenate_videoclips,
 )
-import pdf2png
+import pdftopng
 from PIL import Image
 from pptx import Presentation
 from pptx.util import Inches
