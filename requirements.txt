@@ -1,9 +1,9 @@
-streamlit
-python-pptx
-moviepy
 google-cloud-texttospeech
+gTTS
+moviepy
+openai
 pdftopng
 Pillow
-openai
-gTTS
 pycountry
+python-pptx
+streamlit
