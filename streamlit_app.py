@@ -596,7 +596,7 @@ def main():
     project.gap_duration = st.number_input(
         "Gap Between Slides (seconds)", min_value=0, value=project.gap_duration
     )
-    project.output_filename = st.text_input("Output Video Filename", value=project.output_filename)
+    project.output_filename = st.text_input("Output Video Filename", value=project.output_filename) 
 
     # --- Slide Gallery ---
     gallery = Gallery(project)
