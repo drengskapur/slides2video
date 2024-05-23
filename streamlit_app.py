@@ -344,20 +344,27 @@ class Gallery:
     def slide_to_image(self, slide, slide_index, temp_dir):
         """Saves a slide as an image."""
         prs = Presentation()
-        prs.slides.add_slide(slide.pptx_slide)
-
-        # Create temporary PPTX file
+        new_slide_layout = prs.slide_layouts.get_by_name(slide.pptx_slide.slide_layout.name)
+        new_slide = prs.slides.add_slide(new_slide_layout)
+    
+        # Copy shapes from the original slide to the new slide
+        for shape in slide.pptx_slide.shapes:
+            el = shape.element
+            newel = copy.deepcopy(el)
+            new_slide.shapes._spTree.insert_element_before(newel, 'p:extLst')
+    
+        # Create a temporary PPTX file
         temp_pptx_path = os.path.join(temp_dir, f"temp_slide_{slide_index}.pptx")
         prs.save(temp_pptx_path)
-
-        # Convert PPTX to PDF using LibreOffice
+    
+        # Convert the PPTX to PDF using LibreOffice
         temp_pdf_path = os.path.join(temp_dir, f"temp_slide_{slide_index}.pdf")
         self.convert_pptx_to_pdf(Path(temp_pptx_path), Path(temp_pdf_path))
-
-        # Convert PDF to PNG
+    
+        # Convert the PDF to PNG
         temp_png_path = os.path.join(temp_dir, f"temp_slide_{slide_index}.png")
-        self.convert_pdf_to_png(temp_pdf_path, temp_png_path)
-
+        self.pdf_to_png(temp_pdf_path, temp_png_path)
+    
         return temp_png_path
 
     def make_chunks(self, size, chunk_size):
