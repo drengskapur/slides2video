@@ -28,11 +28,37 @@ DEFAULT_SLIDE_DURATION = 3
 DEFAULT_OUTPUT_FILENAME = "output_video.mp4"
 DEFAULT_GAP_BETWEEN_SLIDES = 1  # seconds
 
+# --- Page Configuration ---
+st.set_page_config(
+    page_title="PowerPoint to Video Converter",
+    page_icon="🎬",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
 # --- Abstract Base Class for TTS Engines ---
 class TTS(ABC):
     @abstractmethod
     def synthesize_speech(self, text, temp_dir, slide_index, **kwargs):
         pass
+
+    def display_settings(self, slide_index):
+        """Displays UI settings specific to the TTS engine."""
+        pass
+
+    @staticmethod
+    def get_language_code_from_name(language_name):
+        try:
+            return pycountry.languages.get(name=language_name).alpha_2 + "-" + pycountry.countries.get(name=language_name.split(" (")[0]).alpha_2
+        except KeyError:
+            return None
+
+    @staticmethod
+    def get_language_name_from_code(language_code):
+        try:
+            return pycountry.languages.get(alpha_2=language_code.split("-")[0]).name
+        except KeyError:
+            return "Unknown Language"
 
 # --- TTS Engine Implementations ---
 class GTTS_Engine(TTS):
@@ -42,18 +68,111 @@ class GTTS_Engine(TTS):
         tts.save(audio_path)
         return audio_path
 
+    def display_settings(self, slide_index):
+        language_options = list(gTTS.tts_langs().keys())
+        language_code = st.selectbox("Select Language:", options=language_options, key=f"gtts_language_{slide_index}")
+        st.write(f"Language: {gTTS.tts_langs().get(language_code)}")
+        return {"language": language_code}  # Return settings as a dictionary
+
 class GoogleCloud_Engine(TTS):
-    def synthesize_speech(self, text, temp_dir, slide_index, voice_name, language_code, speaking_rate, pitch, credentials_content):
+    def __init__(self):
+        self.credentials_content = None
+
+    def _set_credentials(self, credentials_content):
+        """Sets the Google Cloud credentials."""
+        self.credentials_content = credentials_content
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as creds_file:
+            creds_file.write(self.credentials_content)
+            creds_file.close()
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_file.name
+            try:
+                texttospeech.TextToSpeechClient()
+                os.remove(creds_file.name)
+            except Exception as e:
+                st.warning("Invalid Google Cloud credentials. Please check your input.")
+                st.write(e)
+                return False  # Indicate failure
+            return True  # Indicate success
+
+    def synthesize_speech(self, text, temp_dir, slide_index, voice_name, language_code, speaking_rate, pitch):
         synthesis_input = texttospeech.SynthesisInput(text=text)
         voice = texttospeech.VoiceSelectionParams(name=voice_name, language_code=language_code)
         audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3, speaking_rate=speaking_rate, pitch=pitch)
-        client = texttospeech.TextToSpeechClient.from_service_account_json(credentials_content)
+        client = texttospeech.TextToSpeechClient.from_service_account_json(self.credentials_content)
         response = client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
         audio_path = os.path.join(temp_dir, f"temp_audio_{slide_index}.mp3")
 
         with open(audio_path, "wb") as out:
             out.write(response.audio_content)
         return audio_path
+
+    def _get_language_options(self):
+        """Gets available language codes from Google Cloud TTS."""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as creds_file:
+            creds_file.write(self.credentials_content)
+            creds_file.close()
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_file.name
+            try:
+                client = texttospeech.TextToSpeechClient()
+                voices = client.list_voices().voices
+                language_codes = sorted({voice.language_codes[0] for voice in voices})
+                os.remove(creds_file.name)
+                return language_codes
+            except Exception as e:
+                st.error(f"Error fetching languages: {e}")
+                return []
+
+    @st.cache_data(show_spinner=False)  # Cache but don't show spinner 
+    def _get_google_tts_voices(self, language_code="en-US"):
+        """Gets available voices for a specific language code."""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as creds_file:
+            creds_file.write(self.credentials_content)
+            creds_file.close()
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_file.name
+            try:
+                client = texttospeech.TextToSpeechClient()
+                voices = client.list_voices().voices
+                voice_options = [
+                    (f"{voice.name} ({self.get_language_name_from_code(voice.language_codes[0])}, {texttospeech.SsmlVoiceGender(voice.ssml_gender).name})", voice.name)
+                    for voice in voices
+                    if voice.language_codes and voice.name and voice.ssml_gender and voice.language_codes[0] == language_code
+                ]
+                os.remove(creds_file.name)
+                return voice_options
+
+            except Exception as e:
+                st.error(f"Error initializing Google TTS: {e}")
+                return []
+
+    def display_settings(self, slide_index):
+        google_credentials = st.text_area("Paste Google Cloud Credentials JSON:", key=f"google_creds_{slide_index}")
+        settings = {}  # Initialize empty settings dictionary
+
+        if google_credentials:
+            if self._set_credentials(google_credentials):
+                st.success("Google Cloud credentials validated!")
+
+                language_options = self._get_language_options()
+                language_code = st.selectbox("Select Language:", options=language_options, key=f"google_language_{slide_index}")
+                language_name = self.get_language_name_from_code(language_code)
+                st.write(f"Language: {language_name}")
+                
+                voice_options = self._get_google_tts_voices(language_code)
+                if voice_options:
+                    selected_voice = st.selectbox("Select a voice:", [voice[0] for voice in voice_options], key=f"google_voice_{slide_index}")
+                    voice_name = dict(voice_options)[selected_voice]
+                    speaking_rate = st.slider("Speaking Rate:", min_value=0.25, max_value=4.0, value=1.0, step=0.25, key=f"speaking_rate_{slide_index}")
+                    pitch = st.slider("Pitch:", min_value=-20.0, max_value=20.0, value=0.0, step=1.0, key=f"pitch_{slide_index}")
+
+                    # Update settings dictionary
+                    settings.update(
+                        {"voice_name": voice_name, "language_code": language_code, 
+                         "speaking_rate": speaking_rate, "pitch": pitch}
+                    )
+                else:
+                    st.warning("No voices found. Try different credentials or language.")
+
+        return settings 
 
 class OpenAI_Engine(TTS):
     def synthesize_speech(self, text, voice_name, api_key, model="tts-1-hd"):
@@ -63,89 +182,317 @@ class OpenAI_Engine(TTS):
             temp_file.write(response.content)
         return temp_file.name
 
-# --- Helper Functions ---
-def slide_to_image(slide, slide_index, temp_dir):
-    image_path = os.path.join(temp_dir, f"slide_{slide_index}.png")
-    slide.save(image_path, format="png")
-    return image_path
+    def display_settings(self, slide_index):
+        openai_api_key = st.text_input("Enter your OpenAI API Key:", key=f"openai_key_{slide_index}")
+        settings = {}  # Initialize an empty settings dictionary
+        if openai_api_key:
+            try:
+                openai.api_key = openai_api_key
+                openai.Engine.list()  # This will raise an exception if the key is invalid
+                st.success("OpenAI API key validated!")
 
+                # If the key is valid, get available voices (not directly provided by the API)
+                voice_name = st.selectbox(
+                    "Select a voice:",
+                    [
+                        "alloy",
+                        "echo",
+                        "fable",
+                        "onyx",
+                        "nova",
+                        "shimmer",
+                    ],
+                    key=f"openai_voice_{slide_index}",
+                )
+                model = st.selectbox("Select Model:", ["tts-1", "tts-1-hd"], key=f"openai_model_{slide_index}")
 
-def make_chunks(size, chunk_size):
-    return [size[i : i + chunk_size] for i in range(0, len(size), chunk_size)]
+                # Update the settings dictionary
+                settings.update({"voice_name": voice_name, "api_key": openai_api_key, "model": model})
 
+            except openai.error.AuthenticationError:
+                st.warning("Invalid OpenAI API key.")
+            except Exception as e:
+                st.warning("An error occurred while validating your API key.")
+                st.write(e)
+        return settings
 
-def convert_pptx_to_pdf(input_pptx: Path):
-    output_pdf_path: Path = Path("downloads") / f"{input_pptx.stem}.pdf"
-    try:
-        Path("downloads").mkdir(parents=True, exist_ok=True)
-        if shutil.which("libreoffice") is None:
-            raise FileNotFoundError("LibreOffice is not installed or not in the PATH. Please install LibreOffice.")
+# --- UI Components ---
+class Project:
+    def __init__(self, project_name="MyProject"):
+        self.project_name = project_name
+        self.slides = [Slide()] # Initialize with a blank slide
+        self.slide_duration = DEFAULT_SLIDE_DURATION
+        self.gap_duration = DEFAULT_GAP_BETWEEN_SLIDES
+        self.output_filename = DEFAULT_OUTPUT_FILENAME
 
-        cmd = ["libreoffice", "--headless", "--convert-to", "pdf", str(input_pptx), "--outdir", str(output_pdf_path.parent)]
-        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        return output_pdf_path
+    def load_from_file(self, project_data):
+        """Loads project data from a dictionary."""
+        self.slides = [Slide.from_data(data) for data in project_data.get("slides_data", [])]
+        self.slide_duration = project_data.get("slide_duration", DEFAULT_SLIDE_DURATION)
+        self.gap_duration = project_data.get("gap_duration", DEFAULT_GAP_BETWEEN_SLIDES)
+        self.output_filename = project_data.get("output_filename", DEFAULT_OUTPUT_FILENAME)
 
-    except Exception as e:
-        raise RuntimeError(f"Error converting {input_pptx} to PDF: {e}") from e
+    def save_to_file(self):
+        """Saves project data to a JSON file."""
+        project_data = {
+            "slides_data": [slide.to_data() for slide in self.slides],
+            "slide_duration": self.slide_duration,
+            "gap_duration": self.gap_duration,
+            "output_filename": self.output_filename,
+            "audio_files": {},
+        }
 
-@st.cache_data
-def get_google_tts_voices(credentials_content, language_code="en-US"):
-    with tempfile.NamedTemporaryFile(mode="w", delete=False) as creds_file:
-        creds_file.write(credentials_content)
-        creds_file.close()
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_file.name
+        # Save audio files as base64 encoded strings
+        for i, slide in enumerate(self.slides):
+            if slide.audio_path and os.path.exists(slide.audio_path):
+                with open(slide.audio_path, "rb") as audio_file:
+                    audio_base64 = base64.b64encode(audio_file.read()).decode("utf-8")
+                    project_data["audio_files"][f"audio_{i}"] = audio_base64
+
         try:
-            client = texttospeech.TextToSpeechClient()
-            voices = client.list_voices().voices
-            voice_options = [
-                (f"{voice.name} ({pycountry.languages.get(alpha_2=voice.language_codes[0].split('-')[0]).name}, {texttospeech.SsmlVoiceGender(voice.ssml_gender).name})", voice.name)
-                for voice in voices
-                if voice.language_codes and voice.name and voice.ssml_gender and voice.language_codes[0] == language_code
+            with open(f"{self.project_name}.json", "w") as f:
+                json.dump(project_data, f)
+            st.success(f"Project '{self.project_name}' saved successfully!")
+        except Exception as e:
+            st.error(f"Error saving project: {e}")
+
+class Slide:
+    def __init__(self, pptx_slide=None):
+        self.pptx_slide = pptx_slide or self._create_new_slide()
+        self.voiceover = ""
+        self.audio_path = None
+        self.tts_settings = {}
+
+    @classmethod
+    def from_data(cls, data):
+        """Creates a Slide object from loaded data."""
+        slide = cls()
+        slide.voiceover = data.get("voiceover", "")
+        slide.audio_path = data.get("audio_path", None)
+        slide.tts_settings = data.get("tts_settings", {})
+        return slide
+
+    def to_data(self):
+        """Prepares slide data for saving."""
+        return {
+            "voiceover": self.voiceover,
+            "audio_path": self.audio_path,
+            "tts_settings": self.tts_settings,
+        }
+    
+    def _create_new_slide(self):
+        """Creates a new blank slide and returns it."""
+        prs = Presentation()
+        blank_layout = prs.slide_layouts[6]
+        return prs.slides.add_slide(blank_layout)
+
+class Gallery:
+    def __init__(self, project):
+        self.project = project
+
+    def display(self):
+        """Displays the slide gallery and handles new slide creation."""
+        cols = st.columns(3)
+        for i, slide in enumerate(self.project.slides):
+            with cols[i % 3]:
+                with st.container():
+                    self._display_slide_preview(slide, i)
+                    with st.expander(f"Slide {i + 1}", expanded=False):
+                        if st.button(f"Edit Slide {i+1}"):
+                            st.session_state["editing_slide"] = True
+                            st.session_state["edit_slide_index"] = i
+                            st.experimental_rerun()
+
+        # --- Add Slide Button ---
+        if st.button("Add Slide"):
+            self.add_new_slide()
+            st.experimental_rerun()
+
+    def _display_slide_preview(self, slide, slide_index):
+        """Displays a preview of the slide."""
+        image_stream = BytesIO()
+        slide.pptx_slide.save(image_stream, format="png")
+        image_stream.seek(0)
+        st.image(Image.open(image_stream), width=200, use_column_width=True)
+
+        # Play Audio Button - Only show if audio exists
+        if slide.audio_path:
+            if st.button(f"Play Audio {slide_index + 1}"):
+                st.audio(slide.audio_path, format="audio/mp3")
+
+    def add_new_slide(self):
+        """Adds a new blank slide to the project."""
+        self.project.slides.append(Slide())
+
+    def slide_to_image(self, slide, slide_index, temp_dir):
+        """Saves a slide as an image."""
+        image_path = os.path.join(temp_dir, f"slide_{slide_index}.png")
+        slide.save(image_path, format="png")
+        return image_path
+
+    def make_chunks(self, size, chunk_size):
+        """Splits a sequence into chunks."""
+        return [size[i : i + chunk_size] for i in range(0, len(size), chunk_size)]
+
+    def convert_pptx_to_pdf(self, input_pptx: Path):
+        """Converts a PPTX file to PDF using LibreOffice."""
+        output_pdf_path: Path = Path("downloads") / f"{input_pptx.stem}.pdf"
+        try:
+            Path("downloads").mkdir(parents=True, exist_ok=True)
+            if shutil.which("libreoffice") is None:
+                raise FileNotFoundError(
+                    "LibreOffice is not installed or not in the PATH. Please install LibreOffice."
+                )
+
+            cmd = [
+                "libreoffice",
+                "--headless",
+                "--convert-to",
+                "pdf",
+                str(input_pptx),
+                "--outdir",
+                str(output_pdf_path.parent),
             ]
-            return voice_options
+            subprocess.run(
+                cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+            return output_pdf_path
 
         except Exception as e:
-            st.error(f"Error initializing Google TTS: {e}")
-            return []
+            raise RuntimeError(
+                f"Error converting {input_pptx} to PDF: {e}"
+            ) from e
 
-        finally:
-            os.remove(creds_file.name)
+class Editor:
+    def __init__(self, project, slide_index):
+        self.project = project
+        self.slide_index = slide_index
+        self.slide = self.project.slides[self.slide_index]
 
+    def display(self):
+        """Displays the slide editor in a modal."""
+        # Modal can be controlled with a session state variable
+        if "editing_slide" in st.session_state and st.session_state["editing_slide"]:
+            with st.modal(f"Editing Slide {self.slide_index + 1}"):
+                self._display_slide_content()
+                self._display_voiceover_options()
+                if st.button("Done Editing"):
+                    st.session_state["editing_slide"] = False
+                    st.experimental_rerun()
 
-def get_language_options(credentials_content):
-    with tempfile.NamedTemporaryFile(mode="w", delete=False) as creds_file:
-        creds_file.write(credentials_content)
-        creds_file.close()
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_file.name
-        try:
-            client = texttospeech.TextToSpeechClient()
-            voices = client.list_voices().voices
-            language_codes = sorted({voice.language_codes[0] for voice in voices})
-            return language_codes
+def _display_slide_content(self):
+        """Displays and allows editing of slide content."""
+        st.write(f"**Slide {self.slide_index + 1}**")
+        image_stream = BytesIO()
+        self.slide.pptx_slide.save(image_stream, format="png")
+        image_stream.seek(0)
+        st.image(Image.open(image_stream), width=600)
 
-        except Exception as e:
-            st.error(f"Error fetching languages: {e}")
-            return []
-        finally:
-            os.remove(creds_file.name)
+        with st.expander(f"Edit Slide {self.slide_index + 1} Content", expanded=True):
+            for shape_index, shape in enumerate(self.slide.pptx_slide.shapes):
+                if shape.has_text_frame:
+                    current_text = shape.text_frame.text
+                    new_text = st.text_area(
+                        f"Edit text (currently: {current_text}):",
+                        value=current_text,
+                        key=f"text_{self.slide_index}_{shape_index}",
+                    )
+                    shape.text_frame.text = new_text
+                elif shape.has_table:
+                    st.write("Table:")
+                    for row_idx, row in enumerate(shape.table.rows):
+                        cols = st.columns(len(row.cells))
+                        for col_idx, cell in enumerate(row.cells):
+                            with cols[col_idx]:
+                                current_text = cell.text_frame.text
+                                new_text = st.text_input(
+                                    f"Cell ({row_idx}, {col_idx})", value=current_text, key=f"table_{self.slide_index}_{shape_index}_{row_idx}_{col_idx}"
+                                )
+                                cell.text_frame.text = new_text
+                elif shape.shape_type == 13:  # Picture
+                    st.write(f"Picture {shape_index + 1}")
+                    uploaded_image = st.file_uploader(
+                        "Replace this picture:", type=["png", "jpg", "jpeg"], key=f"image_upload_{self.slide_index}_{shape_index}"
+                    )
+                    if uploaded_image is not None:
+                        picture_placeholder = shape.parent.placeholders[shape_index]
+                        picture_placeholder.insert_picture(uploaded_image)
+                    st.write("Resize Picture:")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        width = st.number_input("Width (inches):", value=shape.width.inches, key=f"pic_width_{self.slide_index}_{shape_index}")
+                    with col2:
+                        height = st.number_input("Height (inches):", value=shape.height.inches, key=f"pic_height_{self.slide_index}_{shape_index}")
+                    shape.width = Inches(width)
+                    shape.height = Inches(height)
 
+    def _display_voiceover_options(self):
+        """Displays and handles voiceover settings and generation."""
+        st.write("**Voiceover:**")
+        self.slide.voiceover = st.text_area(
+            f"Enter/Edit voiceover for Slide {self.slide_index + 1}:",
+            key=f"voiceover_{self.slide_index}",
+            value=self.slide.voiceover,
+        )
+        self.slide.tts_settings = self._display_tts_options()
+        if self.slide.audio_path:
+            st.audio(self.slide.audio_path, format="audio/mp3")
 
-def get_language_code_from_name(language_name):
-    try:
-        return pycountry.languages.get(name=language_name).alpha_2 + "-" + pycountry.countries.get(name=language_name.split(" (")[0]).alpha_2
-    except KeyError:
-        return None
+    def _display_tts_options(self):
+        """Displays TTS engine selection and settings."""
+        st.write("**Voiceover Settings:**")
+        tts_engine_key = f"tts_engine_dialog_{self.slide_index}"
+        tts_engine_name = st.radio(
+            "", ["gTTS", "Google Cloud", "OpenAI"], key=tts_engine_key, horizontal=True
+        )
 
+        tts_engines = {
+            "gTTS": GTTS_Engine(),
+            "Google Cloud": GoogleCloud_Engine(),
+            "OpenAI": OpenAI_Engine(),
+        }
+        selected_tts_engine = tts_engines[tts_engine_name]
 
-def get_language_name_from_code(language_code):
-    try:
-        return pycountry.languages.get(alpha_2=language_code.split("-")[0]).name
-    except KeyError:
-        return "Unknown Language"
+        settings = selected_tts_engine.display_settings(self.slide_index)
 
+        if st.button(f"Generate Voiceover {self.slide_index + 1}"):
+            with st.spinner("Generating voiceover..."):
+                try:
+                    audio_path = selected_tts_engine.synthesize_speech(
+                        text=self.slide.voiceover,
+                        temp_dir="temp",
+                        slide_index=self.slide_index,
+                        **settings
+                    )
 
-# --- Video Generation Function ---
-@st.cache_data
+                    self.slide.audio_path = audio_path
+                    st.success("Voiceover generated!")
+                    st.audio(audio_path, format="audio/mp3")
+                except Exception as e:
+                    st.error(f"Error generating voiceover: {e}")
+
+        return settings
+
+# --- Cached function to create audio ---
+@st.cache_data 
+def create_audio(text, voice_name, temp_dir, slide_index, tts_engine, credentials_content=None, language_code="en-US", speaking_rate=1.0, pitch=0.0, model="tts-1-hd", **kwargs):
+    if text:
+        if tts_engine == "gTTS":
+            audio_path = GTTS_Engine().synthesize_speech(text, temp_dir, slide_index, language_code)
+        elif tts_engine == "Google Cloud":
+            audio_path = GoogleCloud_Engine().synthesize_speech(text, temp_dir, slide_index, voice_name, language_code, speaking_rate, pitch)
+        elif tts_engine == "OpenAI":
+            audio_path = OpenAI_Engine().synthesize_speech(text, voice_name, credentials_content, model)
+        else:
+            st.error("Invalid TTS engine selected.")
+            return None
+    else:
+        audio_path = os.path.join(temp_dir, f"temp_audio_{slide_index}.mp3")
+        AudioFileClip(Gallery.make_chunks(self=Gallery, size=[1], chunk_size=0.1)[0]).write_audiofile(audio_path)
+    return audio_path
+
+# --- Cached Video Generation Function ---
+@st.cache_data 
 def generate_video(slides_data, slide_duration, gap_duration, output_filename, voice_name, credentials_content, tts_engine, end_slide_index=None):
     try:
         slide_duration = int(slide_duration)
@@ -164,10 +511,10 @@ def _create_video_from_data(slides_data, slide_duration, gap_duration, output_fi
     slides_to_process = slides_data if end_slide_index is None else slides_data[: end_slide_index + 1]
     for i, slide_data in enumerate(slides_to_process):
         slide = slide_data["slide"]
-        image_path = slide_to_image(slide, i, temp_dir)
+        image_path = Gallery.slide_to_image(self=Gallery, slide=slide, slide_index=i, temp_dir=temp_dir)
         image_clips.append(ImageClip(image_path))
         text = slide_data.get("voiceover", "")
-        audio_path = create_audio(text, voice_name, temp_dir, i, tts_engine, credentials_content)
+        audio_path = create_audio(text, voice_name, temp_dir, i, tts_engine, credentials_content, **slide_data["tts_settings"])
         audio_clip = AudioFileClip(audio_path)
         audio_clips.append(audio_clip)
         actual_slide_duration = max(slide_duration, audio_clip.duration)
@@ -181,430 +528,131 @@ def _create_video_from_data(slides_data, slide_duration, gap_duration, output_fi
     final_video.write_videofile(video_path, fps=24)
     return video_path
 
-
-# --- UI Functions ---
-def display_slide_preview(slide, slide_index):
-    st.write(f"**Slide {slide_index + 1}**")
-    image_stream = BytesIO()
-    slide.save(image_stream, format="png")
-    image_stream.seek(0)
-    st.image(Image.open(image_stream), width=300)
-    if st.session_state["slides_data"][slide_index]["audio_path"]:
-        st.audio(st.session_state["slides_data"][slide_index]["audio_path"], format="audio/mp3")
-    else:
-        st.warning("No voiceover generated for this slide yet.")
-
-
-def display_slide_editor(slide_data, slide_index):
-    slide = slide_data["slide"]
-    st.write(f"**Slide {slide_index + 1}**")
-    image_stream = BytesIO()
-    slide.save(image_stream, format="png")
-    image_stream.seek(0)
-    st.image(Image.open(image_stream), width=600)
-    with st.expander(f"Edit Slide {slide_index + 1} Content", expanded=True):
-        for shape_index, shape in enumerate(slide.shapes):
-            if shape.has_text_frame:
-                current_text = shape.text_frame.text
-                new_text = st.text_area(f"Edit text (currently: {current_text}):", value=current_text, key=f"text_{slide_index}_{shape_index}")
-                shape.text_frame.text = new_text
-            elif shape.has_table:
-                st.write("Table:")
-                for row_idx, row in enumerate(shape.table.rows):
-                    cols = st.columns(len(row.cells))
-                    for col_idx, cell in enumerate(row.cells):
-                        with cols[col_idx]:
-                            current_text = cell.text_frame.text
-                            new_text = st.text_input(f"Cell ({row_idx}, {col_idx})", value=current_text, key=f"table_{slide_index}_{shape_index}_{row_idx}_{col_idx}")
-                            cell.text_frame.text = new_text
-            elif shape.shape_type == 13:
-                st.write(f"Picture {shape_index + 1}")
-                uploaded_image = st.file_uploader("Replace this picture:", type=["png", "jpg", "jpeg"], key=f"image_upload_{slide_index}_{shape_index}")
-                if uploaded_image is not None:
-                    picture_placeholder = shape.parent.placeholders[shape_index]
-                    picture_placeholder.insert_picture(uploaded_image)
-                st.write("Resize Picture:")
-                col1, col2 = st.columns(2)
-                with col1:
-                    width = st.number_input("Width (inches):", value=shape.width.inches, key=f"pic_width_{slide_index}_{shape_index}")
-                with col2:
-                    height = st.number_input("Height (inches):", value=shape.height.inches, key=f"pic_height_{slide_index}_{shape_index}")
-                shape.width = Inches(width)
-                shape.height = Inches(height)
-
-    st.write("**Voiceover:**")
-    slide_data["voiceover"] = st.text_area(f"Enter/Edit voiceover for Slide {slide_index + 1}:", key=f"voiceover_{slide_index}", value=slide_data["voiceover"])
-    display_tts_options(slide_index, slide_data)
-    if slide_data["audio_path"]:
-        st.audio(slide_data["audio_path"], format="audio/mp3")
-    return slide_data
-
-
-def display_tts_options(slide_index, slide_data):
-    st.write("**Voiceover Settings:**")
-    tts_engine_key = f"tts_engine_dialog_{slide_index}"
-    tts_engine_name = st.radio("", ["gTTS", "Google Cloud", "OpenAI"], key=tts_engine_key, horizontal=True)
-    
-    # Instantiate TTS engines based on selection
-    tts_engines = {
-        "gTTS": GTTS_Engine(),
-        "Google Cloud": GoogleCloud_Engine(),
-        "OpenAI": OpenAI_Engine(),
-    }
-    selected_tts_engine = tts_engines[tts_engine_name]
-
-    voice_name = None
-    language_code = "en-US"
-    credentials_content = None
-    speaking_rate = 1.0
-    pitch = 0.0
-    model = "tts-1-hd"
-
-    if tts_engine_name == "gTTS":
-        language_options = list(gTTS.tts_langs().keys())
-        language_code = st.selectbox("Select Language:", options=language_options, key=f"gtts_language_{slide_index}")
-        st.write(f"Language: {gTTS.tts_langs().get(language_code)}")
-    elif tts_engine_name == "Google Cloud":
-        google_credentials = st.text_area("Paste Google Cloud Credentials JSON:", key=f"google_creds_{slide_index}")
-        if google_credentials:
-            try:
-                with tempfile.NamedTemporaryFile(mode="w", delete=False) as creds_file:
-                    creds_file.write(google_credentials)
-                    creds_file.close()
-                    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_file.name
-                    texttospeech.TextToSpeechClient()
-                    os.remove(creds_file.name)
-                st.success("Google Cloud credentials validated!")
-                language_options = get_language_options(google_credentials)
-                language_code = st.selectbox("Select Language:", options=language_options, key=f"google_language_{slide_index}")
-                language_name = get_language_name_from_code(language_code)
-                st.write(f"Language: {language_name}")
-                voice_options = get_google_tts_voices(google_credentials, language_code)
-                if voice_options:
-                    selected_voice = st.selectbox("Select a voice:", [voice[0] for voice in voice_options], key=f"google_voice_{slide_index}")
-                    voice_name = dict(voice_options)[selected_voice]
-                    credentials_content = google_credentials
-                    speaking_rate = st.slider("Speaking Rate:", min_value=0.25, max_value=4.0, value=1.0, step=0.25, key=f"speaking_rate_{slide_index}")
-                    pitch = st.slider("Pitch:", min_value=-20.0, max_value=20.0, value=0.0, step=1.0, key=f"pitch_{slide_index}")
-                else:
-                    st.warning("No voices found. Try different credentials or language.")
-            except Exception as e:
-                st.warning("Invalid Google Cloud credentials. Please check your input.")
-                st.write(e)
-    elif tts_engine_name == "OpenAI":
-        openai_api_key = st.text_input("Enter your OpenAI API Key:", key=f"openai_key_{slide_index}")
-        if openai_api_key:
-            try:
-                openai.api_key = openai_api_key
-                openai.Engine.list()
-                st.success("OpenAI API key validated!")
-                voice_name = st.selectbox(
-                    "Select a voice:",
-                    [
-                        "alloy",
-                        "echo",
-                        "fable",
-                        "onyx",
-                        "nova",
-                        "shimmer",
-                    ],
-                    key=f"openai_voice_{slide_index}",
-                )
-                credentials_content = openai_api_key
-                model = st.selectbox("Select Model:", ["tts-1", "tts-1-hd"], key=f"openai_model_{slide_index}")
-            except openai.error.AuthenticationError:
-                st.warning("Invalid OpenAI API key.")
-            except Exception as e:
-                st.warning("An error occurred while validating your API key.")
-                st.write(e)
-    if st.button(f"Generate Voiceover {slide_index + 1}"):
-        with st.spinner("Generating voiceover..."):
-            try:
-                # Call the synthesize_speech method of the selected TTS engine
-                audio_path = selected_tts_engine.synthesize_speech(
-                    text=slide_data["voiceover"],
-                    temp_dir="temp",
-                    slide_index=slide_index,
-                    voice_name=voice_name,
-                    language_code=language_code,
-                    speaking_rate=speaking_rate,
-                    pitch=pitch,
-                    credentials_content=credentials_content,
-                    api_key=credentials_content, # OpenAI uses API key as credentials
-                    model=model 
-                )
-                
-                slide_data["audio_path"] = audio_path
-                st.success("Voiceover generated!")
-                st.audio(audio_path, format="audio/mp3")
-            except Exception as e:
-                st.error(f"Error generating voiceover: {e}")
-
-@st.cache_data
-def create_audio(text, voice_name, temp_dir, slide_index, tts_engine, credentials_content=None, language_code="en-US", speaking_rate=1.0, pitch=0.0, model="tts-1-hd"):
-    if text:
-        if tts_engine == "gTTS":
-            audio_path = GTTS_Engine().synthesize_speech(text, temp_dir, slide_index, language_code)
-        elif tts_engine == "Google Cloud":
-            audio_path = GoogleCloud_Engine().synthesize_speech(text, temp_dir, slide_index, voice_name, language_code, speaking_rate, pitch, credentials_content)
-        elif tts_engine == "OpenAI":
-            audio_path = OpenAI_Engine().synthesize_speech(text, voice_name, credentials_content, model)
-        else:
-            st.error("Invalid TTS engine selected.")
-            return None
-    else:
-        audio_path = os.path.join(temp_dir, f"temp_audio_{slide_index}.mp3")
-        AudioFileClip(make_chunks(1, 0.1)[0]).write_audiofile(audio_path)
-    return audio_path
-
-
-def create_new_presentation():
-    prs = Presentation()
-    blank_layout = prs.slide_layouts[6]  # Get blank layout
-    prs.slides.add_slide(blank_layout)  # Add a blank slide
-    return prs
-
 # --- Main Streamlit App ---
 def main():
-    st.set_page_config(
-        page_title="PowerPoint to Video Converter",
-        page_icon="🎬",
-        layout="wide",
-        initial_sidebar_state="expanded",
-    )
+    # --- App Title --- 
     st.title("PowerPoint to Video Converter")
 
-    # --- Project Management (Save/Load) ---
-    project_name = st.text_input("Project Name:", value="MyProject")
-    st.session_state["project_name"] = project_name
+    # --- Project Management ---
+    if "project" not in st.session_state:
+        st.session_state["project"] = Project()
+    project = st.session_state["project"]
+
+    # --- Project Settings ---
+    project.project_name = st.text_input("Project Name:", value=project.project_name)
+
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Save Project"):
-            save_project(project_name)
+            project.save_to_file()
     with col2:
         if st.button("Load Project"):
-            load_project(project_name)
+            try:
+                with open(f"{project.project_name}.json", "r") as f:
+                    project_data = json.load(f)
+                project.load_from_file(project_data)
+                st.success(f"Project '{project.project_name}' loaded successfully!")
+                st.experimental_rerun()  # Rerun to reflect loaded data
+            except FileNotFoundError:
+                st.error(f"Project '{project.project_name}' not found.")
 
     # --- PowerPoint Upload OR New Presentation ---
     uploaded_pptx = st.file_uploader("Upload your PowerPoint presentation (optional)", type=["pptx"])
     create_new = st.checkbox("Create a new presentation", value=True if not uploaded_pptx else False)
 
+    # --- Presentation Logic ---
     if create_new and not uploaded_pptx:
-        prs = create_new_presentation()
+        prs = Presentation()
+        prs.slides.add_slide(prs.slide_layouts[6])
+        project.slides = [Slide(slide) for slide in prs.slides]
     elif uploaded_pptx:
         prs = Presentation(uploaded_pptx)
-    else:
-        prs = None
+        project.slides = [Slide(slide) for slide in prs.slides]
 
-    if prs:
-        # --- Initialize Slide Data ---
-        if "slides_data" not in st.session_state:
-            st.session_state["slides_data"] = []
-            for i, slide in enumerate(prs.slides):
-                st.session_state["slides_data"].append(
-                    {
-                        "slide": slide,
-                        "voiceover": "",
-                        "audio_path": None,
-                    }
-                )
+    # --- Global Settings ---
+    st.header("Global Settings")
+    project.slide_duration = st.number_input(
+        "Minimum Slide Duration (seconds)", min_value=1, value=project.slide_duration
+    )
+    project.gap_duration = st.number_input(
+        "Gap Between Slides (seconds)", min_value=0, value=project.gap_duration
+    )
+    project.output_filename = st.text_input("Output Video Filename", value=project.output_filename)
 
-        # --- Global Settings ---
-        st.sidebar.header("Global Settings")
-        st.session_state["slide_duration"] = st.sidebar.number_input(
-            "Minimum Slide Duration (seconds)",
-            min_value=1,
-            value=DEFAULT_SLIDE_DURATION,
-        )
-        st.session_state["gap_duration"] = st.sidebar.number_input(
-            "Gap Between Slides (seconds)",
-            min_value=0,
-            value=DEFAULT_GAP_BETWEEN_SLIDES,
-        )
-        st.session_state["output_filename"] = st.sidebar.text_input("Output Video Filename", value=DEFAULT_OUTPUT_FILENAME)
+    # --- Slide Gallery ---
+    gallery = Gallery(project)
+    gallery.display()
 
-        # --- Main Content Area ---
-        st.header("Edit Slides")
+    # --- Slide Editor (Modal) ---
+    if "editing_slide" in st.session_state and st.session_state["editing_slide"]:
+        editor = Editor(project, st.session_state["edit_slide_index"])
+        editor.display()
 
-        # --- Display slides as a gallery ---
-        cols = st.columns(3)  # Adjust the number of columns as needed
-        for i, slide_data in enumerate(st.session_state["slides_data"]):
-            with cols[i % 3]:  # Distribute slides across columns
-                with st.container():
-                    image_stream = BytesIO()
-                    slide_data["slide"].save(image_stream, format="png")
-                    image_stream.seek(0)
-                    st.image(Image.open(image_stream), width=200, use_column_width=True)
-                    if slide_data["audio_path"]:
-                        st.audio(slide_data["audio_path"], format="audio/mp3")
-                    with st.expander(f"Slide {i + 1}", expanded=False):
-                        if st.button(f"Edit Slide {i+1}"):
-                            st.session_state["edit_slide_index"] = i
-                            st.experimental_rerun()
-
-
-        # --- Slide Edit Modal ---
-        if "edit_slide_index" in st.session_state:
-            with st.modal(f"Editing Slide {st.session_state['edit_slide_index'] + 1}"):
-                st.session_state["slides_data"][st.session_state["edit_slide_index"]] = display_slide_editor(st.session_state["slides_data"][st.session_state["edit_slide_index"]], st.session_state["edit_slide_index"])
-                if st.button("Done Editing"):
-                    del st.session_state["edit_slide_index"]
-                    st.experimental_rerun()
-        
-        # --- Add Slide Button ---
-        if st.button("Add Slide"):
-            prs.slides.add_slide(prs.slide_layouts[6])  # Add a blank slide
-            st.session_state["slides_data"].append(
-                {
-                    "slide": prs.slides[-1],
-                    "voiceover": "",
-                    "audio_path": "",
-                }
-            )
+    # --- Delete Slide Button ---
+    if len(project.slides) > 1:
+        if st.button("Delete Last Slide"):
+            project.slides.pop()
             st.experimental_rerun()
 
-        # --- Delete Slide Button ---
-        if len(st.session_state["slides_data"]) > 1:
-            if st.button("Delete Last Slide"):
-                del st.session_state["slides_data"][-1]
-                del prs.slides[-1]
-                st.experimental_rerun()
-
-        # --- Video Generation ---
-        st.header("Create Full Video")
-        if st.button("Generate Video"):
-            with st.spinner("Creating video..."):
-                video_path = generate_video(
-                    st.session_state["slides_data"],
-                    st.session_state["slide_duration"],
-                    st.session_state["gap_duration"],
-                    st.session_state["output_filename"],
-                    st.session_state.get("selected_voice_name"),
-                    st.session_state.get("credentials_content"),
-                    st.session_state.get("tts_engine", "gTTS"),
-                )
-
-                if video_path:
-                    st.success("Video created successfully!")
-                    st.balloons()
-                    st.video(video_path)
-
-        # --- Download and Conversion ---
-        st.header("Download and Convert")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Download PPTX"):
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".pptx") as temp_pptx:
-                    prs.save(temp_pptx.name)
-                    st.download_button(
-                        "Download",
-                        data=open(temp_pptx.name, "rb").read(),
-                        file_name=f"{st.session_state['project_name']}.pptx",
-                        mime="application/pptx",
-                    )
-
-        with col2:
-            if st.button("Convert to PDF"):
-                with st.spinner("Converting to PDF..."):
-                    try:
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".pptx") as temp_pptx:
-                            prs.save(temp_pptx.name)
-                            pdf_path = convert_pptx_to_pdf(Path(temp_pptx.name))
-                        if pdf_path and Path(pdf_path).exists():
-                            st.success("PDF created successfully!")
-                            with open(pdf_path, "rb") as pdf_file:
-                                st.download_button(
-                                    label="Download PDF",
-                                    data=pdf_file,
-                                    file_name=f"{Path(pdf_path).name}",
-                                    mime="application/pdf",
-                                )
-                        else:
-                            st.error("PDF conversion failed. Please check the console for errors.")
-                    except Exception as e:
-                        st.error(f"An error occurred during PDF conversion: {e}")
-
-
-# --- Project Save/Load Logic ---
-def save_project(project_name):
-    project_data = {
-        "slides_data": [
-            {
-                "voiceover": slide["voiceover"],
-                "audio_path": slide["audio_path"],
-            }
-            for slide in st.session_state["slides_data"]
-        ],
-        "slide_duration": st.session_state["slide_duration"],
-        "gap_duration": st.session_state["gap_duration"],
-        "output_filename": st.session_state["output_filename"],
-        "tts_engine": st.session_state.get("tts_engine", "gTTS"), # Save the engine
-        "selected_voice_name": st.session_state.get("selected_voice_name", None),
-        "credentials_content": st.session_state.get("credentials_content", None),
-        "audio_files": {},
-    }
-
-    # Save audio files as base64 encoded strings
-    for i, slide_data in enumerate(st.session_state["slides_data"]):
-        audio_path = slide_data.get("audio_path")
-        if audio_path and os.path.exists(audio_path):
-            with open(audio_path, "rb") as audio_file:
-                audio_base64 = base64.b64encode(audio_file.read()).decode("utf-8")
-                project_data["audio_files"][f"audio_{i}"] = audio_base64
-    try:
-        with open(f"{project_name}.json", "w") as f:
-            json.dump(project_data, f)
-        st.success(f"Project '{project_name}' saved successfully!")
-    except Exception as e:
-        st.error(f"Error saving project: {e}")
-
-
-def load_project(project_name):
-    try:
-        with open(f"{project_name}.json", "r") as f:
-            project_data = json.load(f)
-
-        # --- Create a new presentation ---
-        prs = create_new_presentation() 
-        st.session_state["slides_data"] = []
-
-        # Since we're creating a new presentation, we can't match slide IDs
-        # Instead, we'll add slides and content based on the saved data
-        for saved_slide_data in project_data["slides_data"]:
-            prs.slides.add_slide(prs.slide_layouts[6])  # Add a blank slide
-            slide = prs.slides[-1]
-
-            audio_path = ""
-            for i, saved_slide_data in enumerate(project_data["slides_data"]):
-                if f"audio_{i}" in project_data["audio_files"]:
-                    audio_base64 = project_data["audio_files"][f"audio_{i}"]
-                    audio_data = base64.b64decode(audio_base64)
-
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_audio:
-                        temp_audio.write(audio_data)
-                        audio_path = temp_audio.name
-
-            st.session_state["slides_data"].append(
-                {
-                    "slide": slide,
-                    "voiceover": saved_slide_data["voiceover"],
-                    "audio_path": audio_path,
-                }
+    # --- Video Generation ---
+    st.header("Create Full Video")
+    if st.button("Generate Video"):
+        with st.spinner("Creating video..."):
+            video_path = generate_video(
+                [{"slide": slide.pptx_slide, "voiceover": slide.voiceover, "audio_path": slide.audio_path, "tts_settings": slide.tts_settings} for slide in project.slides],
+                project.slide_duration,
+                project.gap_duration,
+                project.output_filename,
+                st.session_state.get("selected_voice_name"),
+                st.session_state.get("credentials_content"),
+                st.session_state.get("tts_engine", "gTTS"),
             )
 
-        st.session_state["slide_duration"] = project_data["slide_duration"]
-        st.session_state["gap_duration"] = project_data.get("gap_duration", 1)
-        st.session_state["output_filename"] = project_data["output_filename"]
-        st.session_state["tts_engine"] = project_data.get("tts_engine", "gTTS") # Load the engine
-        st.session_state["selected_voice_name"] = project_data.get("selected_voice_name", None)
-        st.session_state["credentials_content"] = project_data.get("credentials_content", None)
-        st.success(f"Project '{project_name}' loaded successfully!")
-        st.experimental_rerun()
+            if video_path:
+                st.success("Video created successfully!")
+                st.balloons()
+                st.video(video_path)
 
-    except FileNotFoundError:
-        st.error(f"Project '{project_name}' not found.")
-    except Exception as e:
-        st.error(f"Error loading project: {e}")
+    # --- Download and Conversion ---
+    st.header("Download and Convert")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Download PPTX"):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pptx") as temp_pptx:
+                prs = Presentation()
+                for slide in project.slides:
+                    prs.slides.add_slide(slide.pptx_slide)
+                prs.save(temp_pptx.name)
+                st.download_button(
+                    "Download PPTX",
+                    data=open(temp_pptx.name, "rb").read(),
+                    file_name=f"{project.project_name}.pptx",
+                    mime="application/pptx",
+                )
+
+    with col2:
+        if st.button("Convert to PDF"):
+            with st.spinner("Converting to PDF..."):
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pptx") as temp_pptx:
+                        prs = Presentation()
+                        for slide in project.slides:
+                            prs.slides.add_slide(slide.pptx_slide)
+                        prs.save(temp_pptx.name)
+                        pdf_path = gallery.convert_pptx_to_pdf(Path(temp_pptx.name))
+                    if pdf_path and Path(pdf_path).exists():
+                        st.success("PDF created successfully!")
+                        with open(pdf_path, "rb") as pdf_file:
+                            st.download_button(
+                                label="Download PDF",
+                                data=pdf_file,
+                                file_name=f"{Path(pdf_path).name}",
+                                mime="application/pdf",
+                            )
+                    else:
+                        st.error("PDF conversion failed. Please check the console for errors.")
+                except Exception as e:
+                    st.error(f"An error occurred during PDF conversion: {e}")
 
 # --- Run the App ---
 if __name__ == "__main__":
