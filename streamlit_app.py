@@ -335,40 +335,39 @@ class Gallery:
         if st.button("Add Slide"):
             self.add_new_slide(selected_layout_index)
             st.experimental_rerun()
-
-def resize_image_to_even_dimensions(image):
-    width, height = image.size
-    even_width = width if width % 2 == 0 else width + 1
-    even_height = height if height % 2 == 0 else height + 1
-    return image.resize((even_width, even_height))
-
-def _display_slide_preview(self, slide, slide_index):
-    """Displays a preview of the slide."""
-    image_stream = BytesIO()
-    prs = Presentation()
-
-    # Create a temporary file to store the PDF
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
-        prs.slides.add_slide(slide.pptx_slide.slide_layout)  
-        prs.save(temp_pdf.name, format="pdf")
-
-        # Convert the PDF to PNG
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_png:
-            images = pdf2image.convert_from_path(temp_pdf.name, dpi=300)
-            resized_image = resize_image_to_even_dimensions(images[0])
-            resized_image.save(temp_png.name, "PNG")
-
-            # Load the PNG into the image stream
-            with open(temp_png.name, "rb") as png_file:
-                image_stream.write(png_file.read())
-
-    image_stream.seek(0)
-    st.image(Image.open(image_stream), width=200, use_column_width=True)
-
-    # Play Audio Button - Only show if audio exists
-    if slide.audio_path:
-        if st.button(f"Play Audio {slide_index + 1}"):
-            st.audio(slide.audio_path, format="audio/mp3")
+    
+    def resize_image_to_even_dimensions(self, image):
+        width, height = image.size
+        even_width = width if width % 2 == 0 else width + 1
+        even_height = height if height % 2 == 0 else height + 1
+        return image.resize((even_width, even_height))
+    
+    def _display_slide_preview(self, slide, slide_index):
+        """Displays a preview of the slide."""
+        prs = Presentation()
+        prs.slides.add_slide(slide.pptx_slide)
+        
+        # Create a temporary PPTX file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pptx") as temp_pptx:
+            prs.save(temp_pptx.name)
+        
+            # Convert the PPTX to PDF using LibreOffice
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
+                self.convert_pptx_to_pdf(Path(temp_pptx.name), Path(temp_pdf.name))
+        
+                # Convert the PDF to PNG
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_png:
+                    images = pdf2image.convert_from_path(temp_pdf.name, dpi=300)
+                    resized_image = self.resize_image_to_even_dimensions(images[0])
+                    resized_image.save(temp_png.name, "PNG")
+        
+                    # Display the PNG preview
+                    st.image(Image.open(temp_png.name), width=200, use_column_width=True)
+    
+        # Play Audio Button - Only show if audio exists
+        if slide.audio_path:
+            if st.button(f"Play Audio {slide_index + 1}"):
+                st.audio(slide.audio_path, format="audio/mp3")
 
     def add_new_slide(self, layout_index):
         """Adds a new slide with the specified layout index to the project."""
