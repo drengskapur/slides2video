@@ -256,9 +256,9 @@ def display_tts_options(slide_index, slide_data):
         pitch = 0.0
         model = "tts-1-hd"
         if tts_engine == "gTTS":
-            language_options = list(gtts.tts_langs().keys())
+            language_options = list(gTTS.tts_langs().keys())
             language_code = st.selectbox("Select Language:", options=language_options, key=f"gtts_language_{slide_index}")
-            st.write(f"Language: {gtts.tts_langs().get(language_code)}")
+            st.write(f"Language: {gTTS.tts_langs().get(language_code)}")
         if tts_engine == "Google Cloud":
             google_credentials = st.text_area("Paste Google Cloud Credentials JSON:", key=f"google_creds_{slide_index}")
             if google_credentials:
