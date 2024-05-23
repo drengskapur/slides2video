@@ -1,30 +1,23 @@
 import base64
 import json
 import os
-import tempfile
-from io import BytesIO
-import subprocess
-from pathlib import Path
 import shutil
+import subprocess
+import tempfile
 from abc import ABC, abstractmethod
-from datetime import date, time
+from io import BytesIO
+from pathlib import Path
 
 import openai
-import pycountry
-from gtts import gTTS
-from moviepy.editor import (
-    AudioFileClip,
-    CompositeAudioClip,
-    ImageClip,
-    concatenate_videoclips,
-)
 import pdf2image
+import pycountry
+import streamlit as st
+from google.cloud import texttospeech
+from gtts import gTTS
+from moviepy.editor import AudioFileClip, CompositeAudioClip, ImageClip, concatenate_videoclips
 from PIL import Image
 from pptx import Presentation
 from pptx.util import Inches
-from google.cloud import texttospeech
-import streamlit as st
-import pandas as pd
 
 # --- Constants ---
 DEFAULT_SLIDE_DURATION = 3
@@ -173,8 +166,7 @@ class GoogleCloud_Engine(TTS):
                 pitch = st.slider("Pitch:", min_value=-20.0, max_value=20.0, value=0.0, step=1.0, key=f"pitch_{slide_index}")
 
                 # Update settings dictionary
-                return {"voice_name": voice_name, "language_code": language_code,
-                        "speaking_rate": speaking_rate, "pitch": pitch}
+                return {"voice_name": voice_name, "language_code": language_code, "speaking_rate": speaking_rate, "pitch": pitch}
             else:
                 st.warning("No voices found. Try different credentials or language.")
         return {}
@@ -194,7 +186,7 @@ class OpenAI_Engine(TTS):
             if api_key:
                 try:
                     openai.api_key = api_key
-                    openai.Engine.list()  
+                    openai.Engine.list()
                     st.session_state["openai_api_key"] = api_key
                     st.success("OpenAI API key validated!")
 
@@ -330,40 +322,39 @@ class Gallery:
         ]
         selected_layout_name = st.selectbox("Select Slide Layout:", layout_names)
         selected_layout_index = layout_names.index(selected_layout_name)
-        
 
         if st.button("Add Slide"):
             self.add_new_slide(selected_layout_index)
             st.experimental_rerun()
-    
+
     def resize_image_to_even_dimensions(self, image):
         width, height = image.size
         even_width = width if width % 2 == 0 else width + 1
         even_height = height if height % 2 == 0 else height + 1
         return image.resize((even_width, even_height))
-    
+
     def _display_slide_preview(self, slide, slide_index):
         """Displays a preview of the slide."""
         prs = Presentation()
         prs.slides.add_slide(slide.pptx_slide)
-        
+
         # Create a temporary PPTX file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pptx") as temp_pptx:
             prs.save(temp_pptx.name)
-        
+
             # Convert the PPTX to PDF using LibreOffice
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
                 self.convert_pptx_to_pdf(Path(temp_pptx.name), Path(temp_pdf.name))
-        
+
                 # Convert the PDF to PNG
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_png:
                     images = pdf2image.convert_from_path(temp_pdf.name, dpi=300)
                     resized_image = self.resize_image_to_even_dimensions(images[0])
                     resized_image.save(temp_png.name, "PNG")
-        
+
                     # Display the PNG preview
                     st.image(Image.open(temp_png.name), width=200, use_column_width=True)
-    
+
         # Play Audio Button - Only show if audio exists
         if slide.audio_path:
             if st.button(f"Play Audio {slide_index + 1}"):
@@ -390,9 +381,7 @@ class Gallery:
         try:
             Path("downloads").mkdir(parents=True, exist_ok=True)
             if shutil.which("libreoffice") is None:
-                raise FileNotFoundError(
-                    "LibreOffice is not installed or not in the PATH. Please install LibreOffice."
-                )
+                raise FileNotFoundError("LibreOffice is not installed or not in the PATH. Please install LibreOffice.")
 
             cmd = [
                 "libreoffice",
@@ -403,15 +392,11 @@ class Gallery:
                 "--outdir",
                 str(output_pdf_path.parent),
             ]
-            subprocess.run(
-                cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             return output_pdf_path
 
         except Exception as e:
-            raise RuntimeError(
-                f"Error converting {input_pptx} to PDF: {e}"
-            ) from e
+            raise RuntimeError(f"Error converting {input_pptx} to PDF: {e}") from e
 
 
 class Editor:
@@ -458,15 +443,11 @@ class Editor:
                         for col_idx, cell in enumerate(row.cells):
                             with cols[col_idx]:
                                 current_text = cell.text_frame.text
-                                new_text = st.text_input(
-                                    f"Cell ({row_idx}, {col_idx})", value=current_text, key=f"table_{self.slide_index}_{shape_index}_{row_idx}_{col_idx}"
-                                )
+                                new_text = st.text_input(f"Cell ({row_idx}, {col_idx})", value=current_text, key=f"table_{self.slide_index}_{shape_index}_{row_idx}_{col_idx}")
                                 cell.text_frame.text = new_text
                 elif shape.shape_type == 13:  # Picture
                     st.write(f"Picture {shape_index + 1}")
-                    uploaded_image = st.file_uploader(
-                        "Replace this picture:", type=["png", "jpg", "jpeg"], key=f"image_upload_{self.slide_index}_{shape_index}"
-                    )
+                    uploaded_image = st.file_uploader("Replace this picture:", type=["png", "jpg", "jpeg"], key=f"image_upload_{self.slide_index}_{shape_index}")
                     if uploaded_image is not None:
                         placeholder = prs.slides[0].placeholders[shape_index]
                         placeholder.insert_picture(uploaded_image)
@@ -516,12 +497,7 @@ class Editor:
                         elif st.session_state["tts_engine"] == "OpenAI":
                             settings["api_key"] = st.session_state.get("openai_api_key")  # Pass API key
 
-                        audio_path = selected_tts_engine.synthesize_speech(
-                            text=self.slide.voiceover,
-                            temp_dir="temp",
-                            slide_index=self.slide_index,
-                            **settings
-                        )
+                        audio_path = selected_tts_engine.synthesize_speech(text=self.slide.voiceover, temp_dir="temp", slide_index=self.slide_index, **settings)
 
                         self.slide.audio_path = audio_path
                         st.success("Voiceover generated!")
@@ -581,7 +557,7 @@ def _create_video_from_data(slides_data, slide_duration, gap_duration, output_fi
         image_clips.append(ImageClip(image_path))
         text = slide_data.get("voiceover", "")
         audio_path = create_audio(text, voice_name, temp_dir, i, tts_engine, credentials_content, **slide_data["tts_settings"])
-        if audio_path is None: # Handle potential error in create_audio
+        if audio_path is None:  # Handle potential error in create_audio
             return None
         audio_clip = AudioFileClip(audio_path)
         audio_clips.append(audio_clip)
@@ -629,13 +605,7 @@ def main():
     def update_tts_engine():
         st.session_state["tts_engine"] = st.session_state["tts_engine_selection"]
 
-    tts_engine_name = st.radio(
-        "Select TTS Engine:",
-        ["gTTS", "Google Cloud", "OpenAI"],
-        key="tts_engine_selection",
-        horizontal=True,
-        on_change=update_tts_engine
-    )
+    tts_engine_name = st.radio("Select TTS Engine:", ["gTTS", "Google Cloud", "OpenAI"], key="tts_engine_selection", horizontal=True, on_change=update_tts_engine)
 
     # --- PowerPoint Upload OR New Presentation ---
     uploaded_pptx = st.file_uploader("Upload your PowerPoint presentation (optional)", type=["pptx"])
@@ -652,12 +622,8 @@ def main():
 
     # --- Global Settings ---
     st.header("Global Settings")
-    project.slide_duration = st.number_input(
-        "Minimum Slide Duration (seconds)", min_value=1, value=project.slide_duration
-    )
-    project.gap_duration = st.number_input(
-        "Gap Between Slides (seconds)", min_value=0, value=project.gap_duration
-    )
+    project.slide_duration = st.number_input("Minimum Slide Duration (seconds)", min_value=1, value=project.slide_duration)
+    project.gap_duration = st.number_input("Gap Between Slides (seconds)", min_value=0, value=project.gap_duration)
     project.output_filename = st.text_input("Output Video Filename", value=project.output_filename)
 
     # --- Slide Gallery ---
@@ -685,14 +651,7 @@ def main():
 
         with st.spinner("Creating video..."):
             video_path = generate_video(
-                [
-                    {
-                        "slide": slide.pptx_slide,
-                        "voiceover": slide.voiceover,
-                        "audio_path": slide.audio_path,
-                        "tts_settings": slide.tts_settings
-                    } for slide in project.slides
-                ],
+                [{"slide": slide.pptx_slide, "voiceover": slide.voiceover, "audio_path": slide.audio_path, "tts_settings": slide.tts_settings} for slide in project.slides],
                 project.slide_duration,
                 project.gap_duration,
                 project.output_filename,
