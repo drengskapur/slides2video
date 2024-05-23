@@ -30,12 +30,11 @@ DEFAULT_GAP_BETWEEN_SLIDES = 1  # seconds
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="PowerPoint to Video Converter",
+    page_title="Slides2Video",
     page_icon="🎬",
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
 
 # --- Abstract Base Class for TTS Engines ---
 class TTS(ABC):
@@ -557,8 +556,6 @@ def _create_video_from_data(slides_data, slide_duration, gap_duration, output_fi
 
 # --- Main Streamlit App ---
 def main():
-    st.title("PowerPoint to Video Converter")
-
     # --- Project Management ---
     if "project" not in st.session_state:
         st.session_state["project"] = Project()
@@ -638,7 +635,6 @@ def main():
     # --- Video Generation ---
     st.header("Create Full Video")
     if st.button("Generate Video"):
-        # Access settings from session state
         voice_name = st.session_state.get("selected_voice_name")
         credentials_content = st.session_state.get("google_credentials_content")  # For Google Cloud
         tts_engine = st.session_state.get("tts_engine", "gTTS")
